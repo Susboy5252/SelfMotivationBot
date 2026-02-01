@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -75,4 +76,27 @@ func (t *TimeZone) GetTimeZone(ctx context.Context, userID int64, lng float64, l
 
 	return nil, timeResponse.TimezoneID
 
+}
+
+func (t *TimeZone) GetUserTimeZone(ctx context.Context, userID int64) (string, error) {
+	var timeZone string
+	row := t.db.QueryRow(ctx, "select timezone from users where id=$1", userID)
+
+	err := row.Scan(&timeZone)
+
+if err != nil {
+	return "", fmt.Errorf("Error QueryRow GetUserTimeZone")
+	}
+	return timeZone, nil
+}
+
+func GetUserLocalTimeZone(timeZone string) (string, error) {
+
+	location, err := time.LoadLocation(timeZone)
+	if err != nil {
+	 return "",	fmt.Errorf("Error time.LoadLocation GetUserLocalTimeZone %w", err)
+	}
+  localTime := time.Now().In(location)
+
+  return	localTime.Format("15:04"), nil
 }

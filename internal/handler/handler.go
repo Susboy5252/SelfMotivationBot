@@ -56,14 +56,14 @@ func (h *handler) Start() {
 			case "waiting_for_reminder":
 				saveReminder(chatID, userText)
 				clearUserState(chatID)
-				msg.Text = fmt.Sprintf("✅ Напоминание сохранено: %s", userText)
+				msg.Text = fmt.Sprintf("✅ Remind is saved: %s", userText)
 				h.bot.Send(msg)
 				continue // Не обрабатываем дальше!
                 
       case "waiting_for_plan":
 				savePlan(chatID, userText)
 				clearUserState(chatID)
-				msg.Text = "✅ План сохранен! Я спрошу вечером о результатах."
+				msg.Text = "✅ Plan is saved!"
 				h.bot.Send(msg)
 				continue
 			case "waiting_for_city":
@@ -83,7 +83,11 @@ func (h *handler) Start() {
 					continue
 				}
 				clearUserState(chatID)
-				msg.Text = fmt.Sprintf("Ваш город сохранен: %f, %f. Ваш временая зоня: %s",coord.Lat, coord.Lng, timez)
+				localTime, err := time.GetUserLocalTimeZone(timez)
+				if err != nil {
+					log.Println(fmt.Errorf("Error :%w", err))
+				}
+				msg.Text = fmt.Sprintf("Your time zone is %s.\nYour local time is %s.\nIf that's not true, try to write your city with /setTime", timez, localTime)
 				
 
     }
@@ -110,8 +114,18 @@ func (h *handler) Start() {
 			h.bot.Send(msg)
 			setUserState(chatID, "waiting_for_city")
 			continue
+		case "setTime":
+			msg.Text = "Please enter your city to find out your time zone"
+			h.bot.Send(msg)
+			setUserState(chatID, "waiting_for_city")
+			continue
 		case "settings":
-		msg.Text = fmt.Sprintf("Ваш город: %s","")
+		timeZone, err := t.GetUserTimeZone(ctx, chatID)
+		localTime, _ := time.GetUserLocalTimeZone(timeZone)
+		if err != nil {
+			log.Println(err)
+		}
+		msg.Text =  fmt.Sprintf("Your time zone is %s.\nYour local time is %s.\nIf that's not true, try to write your city with /setTime", timeZone, localTime)
 		h.bot.Send(msg)
 		continue
 		case "remind":
