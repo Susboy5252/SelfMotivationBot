@@ -1,12 +1,24 @@
 package time
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
+
+	"github.com/jackc/pgx/v5"
 )
 
+type TimeZone struct {
+	db *pgx.Conn
+}
+
+func New(db *pgx.Conn) *TimeZone {
+	return &TimeZone{
+		db :db,
+	}
+}
 func GetCoordinates(city string) (Coordinates, error) {
 	baseURL := "http://api.geonames.org/postalCodeLookupJSON?placename=%s&username=%s"
 	cityEscaped := url.QueryEscape(city)
@@ -34,7 +46,7 @@ func GetCoordinates(city string) (Coordinates, error) {
 	}, nil
 }
 
-func GetTimeZone(lng float64, lat float64) (error, string) {
+func (t *TimeZone) GetTimeZone(ctx context.Context, userID int64, lng float64, lat float64) (error, string) {
 	
 	url := "http://api.geonames.org/timezoneJSON?lat=%f&lng=%f&username=%s"
 	resp, err := http.Get(fmt.Sprintf(url, lat, lng, "kunt"))
@@ -55,6 +67,12 @@ func GetTimeZone(lng float64, lat float64) (error, string) {
 			if len(timeResponse.TimezoneID) == 0 {
 				return fmt.Errorf("Error empty TimezoneID"), (fmt.Sprintf(url, lng, lat, "kunt"))
 	}
+	
+	_, err = t.db.Exec(ctx, "update users set timezone=$1 where id=$2",timeResponse.TimezoneID, userID)
+	if err != nil {
+		return fmt.Errorf("Error Exec TimeZone %w", err), ""
+	}
+
 	return nil, timeResponse.TimezoneID
 
 }

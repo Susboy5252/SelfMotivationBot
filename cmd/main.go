@@ -13,16 +13,16 @@ func main() {
 
 	 err := godotenv.Load()
   if err != nil {
-    log.Fatal("Err		or loading .env file")
+    log.Fatal("Error loading .env file")
   }
 
-	storage.Start()
+	conn := storage.Start()
 
 	bot, err := tgbotapi.NewBotAPI(os.Getenv("BOT_TOKEN"))
 	if err != nil {
 		log.Panic(err)
 	}
-	handle := handler.New(bot)
+	handle := handler.New(bot, conn)
 	handle.Start()
 
 }

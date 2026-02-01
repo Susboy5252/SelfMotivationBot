@@ -1,15 +1,8 @@
 package handler
 
 import (
-	"context"
 	"sync"
 )
-
-type userRepository interface {
-	GetUserCity(ctx context.Context, userID int) (string, error)
-	CreateUser(ctx context.Context, userID int) error
-	UpdateCity(ctx context.Context, userID int, city string) error
-}
 
 var (
 	reminders    = make(map[int64][]string)
