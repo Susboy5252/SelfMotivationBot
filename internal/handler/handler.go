@@ -46,9 +46,8 @@ func (h *handler) Start() {
 	c := newCity(h.conn)
 	t := time.New(h.conn)
 
-	msg := tgbotapi.NewMessage(update.Message.Chat.ID, update.Message.Text)
-	msg.ReplyToMessageID = update.Message.MessageID
-
+	msg := tgbotapi.NewMessage(update.Message.Chat.ID, "")
+	msg.ParseMode = tgbotapi.ModeHTML
 	currentState := getUserState(chatID)
 
 	if currentState != "" {
@@ -58,7 +57,7 @@ func (h *handler) Start() {
 				clearUserState(chatID)
 				msg.Text = fmt.Sprintf("✅ Remind is saved: %s", userText)
 				h.bot.Send(msg)
-				continue // Не обрабатываем дальше!
+				continue
                 
       case "waiting_for_plan":
 				savePlan(chatID, userText)
@@ -66,6 +65,7 @@ func (h *handler) Start() {
 				msg.Text = "✅ Plan is saved!"
 				h.bot.Send(msg)
 				continue
+
 			case "waiting_for_city":
 				coord, err := time.GetCoordinates(userText)
 				if err != nil {
@@ -87,9 +87,10 @@ func (h *handler) Start() {
 				if err != nil {
 					log.Println(fmt.Errorf("Error :%w", err))
 				}
-				msg.Text = fmt.Sprintf("Your time zone is %s.\nYour local time is %s.\nIf that's not true, try to write your city with /setTime", timez, localTime)
+				msg.Text = fmt.Sprintf("<b>Your time zone is</b> %s.\n<b>Your local time is</b> %s.\nIf that's not true, try to write your city with /setTime", timez, localTime)
+				h.bot.Send(msg)
 				
-
+				continue
     }
 	}
 
@@ -125,7 +126,7 @@ func (h *handler) Start() {
 		if err != nil {
 			log.Println(err)
 		}
-		msg.Text =  fmt.Sprintf("Your time zone is %s.\nYour local time is %s.\nIf that's not true, try to write your city with /setTime", timeZone, localTime)
+		msg.Text =  fmt.Sprintf("<b>Your time zone is </b>%s.\n<b>Your local time is </b>%s.\nIf that's not true, try to write your city with /setTime", timeZone, localTime)
 		h.bot.Send(msg)
 		continue
 		case "remind":
@@ -140,7 +141,6 @@ func (h *handler) Start() {
 			continue
 		}
 		}
-	h.bot.Send(msg)
 	}
  }
 
