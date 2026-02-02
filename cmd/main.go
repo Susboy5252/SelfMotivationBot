@@ -23,6 +23,6 @@ func main() {
 		log.Panic(err)
 	}
 	handle := handler.New(bot, conn)
-	handle.Start()
+	go handle.Start()
 
 }
