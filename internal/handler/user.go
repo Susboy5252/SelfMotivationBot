@@ -2,18 +2,17 @@ package handler
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"motivator/models"
 
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type user struct {
-	db *pgx.Conn
+	db *pgxpool.Pool
 }
 
-func newUser (db *pgx.Conn) *user {
+func newUser (db *pgxpool.Pool) *user {
 	return &user {
 		db: db,
 	}
@@ -25,6 +24,12 @@ func newUser (db *pgx.Conn) *user {
 		if err != nil {
 			return fmt.Errorf("Error Exec id or username %w", err)
 		}
+		_, err = u.db.Exec(ctx, "insert into reminders (id) values ($1)", userID)
+
+		if err != nil {
+			return fmt.Errorf("Error Exec id %w", err)
+		}
+
 
 return nil
 	}
@@ -35,7 +40,7 @@ return nil
 		row := u.db.QueryRow(ctx, "select id, username, city, timezone, created_at, updated_at from users where id=$1", userID)
 		err := row.Scan(&user.ID, &user.Username, &user.City, &user.TimeZone, &user.Created_At, &user.Updated_At)
 		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
+			if user.ID == 0{
 				return nil, nil
 			}
 			return nil, fmt.Errorf("Error row.Scan GetUser %w", err)

@@ -4,19 +4,21 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"motivator/internal/time"
 	"strings"
+	"motivator/internal/mytime"
+	"time"
+	
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type handler struct {
 	bot *tgbotapi.BotAPI
-	conn *pgx.Conn
+	conn *pgxpool.Pool
 }
 
-func New(bot *tgbotapi.BotAPI, conn *pgx.Conn) *handler {
+func New(bot *tgbotapi.BotAPI, conn *pgxpool.Pool) *handler {
 	return &handler {
 	bot: bot,
 	conn: conn,
@@ -50,7 +52,11 @@ func (h *handler) Start() {
   userText := strings.TrimSpace(update.Message.Text)
 	u := newUser(h.conn)
 	c := newCity(h.conn)
-	t := time.New(h.conn)
+	t := mytime.New(h.conn)
+	r := newReminder(h.conn)
+	reminderTimeToday := time.Now()
+
+
 
 	msg := tgbotapi.NewMessage(update.Message.Chat.ID, "")
 	msg.ParseMode = tgbotapi.ModeHTML
@@ -59,8 +65,11 @@ func (h *handler) Start() {
 	if currentState != "" {
 		switch currentState {
 			case "waiting_for_reminder": //Need to rework skip now
-				saveReminder(chatID, userText)
-				clearUserState(chatID)
+			err := r.saveReminder(ctx,chatID, reminderTimeToday, userText)
+			if err != nil {
+				fmt.Println(err)
+			}	
+			clearUserState(chatID)
 				msg.Text = fmt.Sprintf("✅ Remind is saved: %s", userText)
 				h.bot.Send(msg)
 				return
@@ -73,7 +82,7 @@ func (h *handler) Start() {
 				return
 
 			case "waiting_for_city":
-				coord, err := time.GetCoordinates(userText)
+				coord, err := mytime.GetCoordinates(userText)
 				if err != nil {
 				 log.Println(fmt.Errorf("Error : %w", err)) //Возможно плохо выводит ошибку, пока похуй
 				}
@@ -89,11 +98,11 @@ func (h *handler) Start() {
 					return
 				}
 				clearUserState(chatID)
-				localTime, err := time.GetUserLocalTimeZone(timez)
+				localTime, err := mytime.GetUserLocalTimeZone(timez)
 				if err != nil {
 					log.Println(fmt.Errorf("Error :%w", err))
 				}
-				msg.Text = fmt.Sprintf("<b>Your time zone is</b> %s.\n<b>Your local time is</b> %s.\nIf that's not true, try to write your city with /setTime", timez, localTime)
+				msg.Text = fmt.Sprintf("<b>Your time zone is</b> %s.\n<b>Your local time is</b> %s.\nIf that's not true, try to write your city with /time", timez, localTime)
 				h.bot.Send(msg)
 				
 				return
@@ -121,18 +130,18 @@ func (h *handler) Start() {
 			h.bot.Send(msg)
 			setUserState(chatID, "waiting_for_city")
 			return
-		case "setTime":
+		case "time":
 			msg.Text = "Please enter your city to find out your time zone"
 			h.bot.Send(msg)
 			setUserState(chatID, "waiting_for_city")
 			return
 		case "settings":
 		timeZone, err := t.GetUserTimeZone(ctx, chatID)
-		localTime, _ := time.GetUserLocalTimeZone(timeZone)
+		localTime, _ := mytime.GetUserLocalTimeZone(timeZone)
 		if err != nil {
 			log.Println(err)
 		}
-		msg.Text =  fmt.Sprintf("<b>Your time zone is </b>%s.\n<b>Your local time is </b>%s.\nIf that's not true, try to write your city with /setTime", timeZone, localTime)
+		msg.Text =  fmt.Sprintf("<b>Your time zone is </b>%s.\n<b>Your local time is </b>%s.\nIf that's not true, try to write your city with /time", timeZone, localTime)
 		h.bot.Send(msg)
 		return
 		case "remind":
@@ -141,12 +150,16 @@ func (h *handler) Start() {
             setUserState(chatID, "waiting_for_reminder")
             return
 		case "getremind":
-			getremind := strings.Join(getReminders(chatID), " ")
-			msg.Text = getremind
+			
+			reminders, err := r.getReminders(ctx, chatID)
+			if err != nil {
+				log.Println(err)
+			}
+			//	msg.Text = strings.Join(reminders, " ")
+			msg.Text = reminders
 			h.bot.Send(msg)
 			return
 		}
 		}
 	}
  }
-

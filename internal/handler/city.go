@@ -4,14 +4,14 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type city struct {
-	db *pgx.Conn
+	db *pgxpool.Pool
 }
 
-func newCity (db *pgx.Conn) *city  {
+func newCity (db *pgxpool.Pool) *city  {
 	return &city  {
 		db: db,
 	}

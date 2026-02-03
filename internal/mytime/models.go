@@ -1,4 +1,4 @@
-package time
+package mytime
 
 type GeonamesResponse struct {
     PostalCodes []struct {

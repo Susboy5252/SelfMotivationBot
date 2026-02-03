@@ -1,4 +1,4 @@
-package time
+package mytime
 
 import (
 	"context"
@@ -8,14 +8,14 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type TimeZone struct {
-	db *pgx.Conn
+	db *pgxpool.Pool
 }
 
-func New(db *pgx.Conn) *TimeZone {
+func New(db *pgxpool.Pool) *TimeZone {
 	return &TimeZone{
 		db :db,
 	}
