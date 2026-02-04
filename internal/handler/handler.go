@@ -7,6 +7,7 @@ import (
 	"strings"
 	"motivator/internal/mytime"
 	"time"
+	"strconv"
 	
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -54,7 +55,6 @@ func (h *handler) Start() {
 	c := newCity(h.conn)
 	t := mytime.New(h.conn)
 	r := newReminder(h.conn)
-	reminderTimeToday := time.Now()
 
 
 
@@ -64,23 +64,39 @@ func (h *handler) Start() {
 
 	if currentState != "" {
 		switch currentState {
-			case "waiting_for_reminder": //Need to rework skip now
-			err := r.saveReminder(ctx,chatID, reminderTimeToday, userText)
+			case "waiting_for_reminder":
+			err := r.saveReminder(ctx,chatID, userText)
 			if err != nil {
 				fmt.Println(err)
 			}	
-			clearUserState(chatID)
+			setUserState(chatID, "waiting_for_data_reminder")
 				msg.Text = fmt.Sprintf("✅ Remind is saved: %s", userText)
 				h.bot.Send(msg)
 				return
                 
       case "waiting_for_plan": //Need to rework skip now
 				savePlan(chatID, userText)
-				clearUserState(chatID)
+				
 				msg.Text = "✅ Plan is saved!"
 				h.bot.Send(msg)
 				return
 
+			case "waiting_for_deleting_remind":
+				localID, err := strconv.Atoi(userText)
+				clearUserState(chatID)
+				if err != nil {
+					msg.Text = "Write a number of remind you want to delete"
+					h.bot.Send(msg)
+				}
+				err = r.deleteReminders(ctx, localID)
+				if err != nil {
+					fmt.Println(err)
+				}
+				return
+			case "waiting_for_data_reminder":
+				err := r.writeReminder(ctx, chatID, userText)
+				clearUserState(chatID)
+				return
 			case "waiting_for_city":
 				coord, err := mytime.GetCoordinates(userText)
 				if err != nil {
@@ -157,6 +173,13 @@ func (h *handler) Start() {
 			}
 			//	msg.Text = strings.Join(reminders, " ")
 			msg.Text = reminders
+			h.bot.Send(msg)
+			return
+		case "delete":
+			msg.Text = "Write a number of remind you want to delete"
+			h.bot.Send(msg)
+			setUserState(chatID, "waiting_for_deleting_remind")
+			msg.Text = "The remind was deleted"
 			h.bot.Send(msg)
 			return
 		}

@@ -10,3 +10,13 @@ type User struct {
 	Created_At time.Time
 	Updated_At time.Time
 }
+
+var(
+		Map_id = make(map[int]int64)
+)
+
+type Reminders struct {
+	Serial_id int64
+	Local_id int
+	Contennt string
+}
