@@ -95,7 +95,7 @@ func (h *handler) Start() {
 			case "waiting_for_data_reminder":
 				msg.Text = "The remind is saved"
 				h.bot.Send(msg)
-				err := r.writeReminder(ctx, chatID, userText)
+				err := r.timeReminder(ctx, chatID, userText)
 				if err != nil {
 					fmt.Println(err)
 				}

@@ -88,7 +88,7 @@ func (r *reminder) saveReminder(ctx context.Context,userID int64, reminder strin
 
 }
 
-func (r *reminder) writeReminder (ctx context.Context, userID int64, remind_at string) error {
+func (r *reminder) timeReminder (ctx context.Context, userID int64, remind_at string) error {
 
 	err, i := r.countReminders(ctx, userID)
 	serialID := models.Map_id[i]
