@@ -20,7 +20,8 @@ func newReminder(db *pgxpool.Pool) *reminder {
 }
 
 func (r *reminder) deleteReminders(ctx context.Context,
-localID int) error {
+localID int, userID int64) error {
+	r.countReminders(ctx, userID)
 	serialID := models.Map_id[localID]
 	_, err := r.db.Exec(ctx, "delete from reminders where id=$1", serialID)
 		if err != nil {
@@ -30,35 +31,48 @@ localID int) error {
 }
 
 func (r *reminder) countReminders(ctx context.Context, userID int64) (error, int) {
-	 query := "Select content, id from reminders where user_id=$1"
+	 query := "Select id from reminders where user_id=$1"
  rows, err := r.db.Query(ctx, query, userID)
 
    if err != nil {
-        return fmt.Errorf("Error h.pool.Query getReminders %w", err), 0
+        return fmt.Errorf("Error h.pool.Query countReminders %w", err), 0
     }
     defer rows.Close()
     
 		var i int
-		var reminders models.Reminders
+		var	reminders models.Reminders
     for rows.Next() {
 			i++
-        err := rows.Scan(&reminders.Contennt, &reminders.Serial_id)
+        err := rows.Scan(&reminders.Serial_id)
         if err != nil {
           return fmt.Errorf("Error rows.Scan getReminders %w", err), 0
         }
 				models.Map_id[i] = reminders.Serial_id
 	}
-		return nil, 0
+		return nil, i
 }
 func (r *reminder) getReminders(ctx context.Context, userID int64) (string, error) {
 	text := ""
-	err, i := r.countReminders(ctx, userID)
+	var	reminders models.Reminders
+	query := "Select content from reminders where user_id=$1"
+  rows, err := r.db.Query(ctx, query, userID)
+		if err != nil {
+        return "", fmt.Errorf("Error h.pool.Query countReminders %w", err)
+    }
+    defer rows.Close()
+	err, _ = r.countReminders(ctx, userID)
 	if err != nil {
-		fmt.Errorf("Error countReminders %w", err)
+		return "Error", fmt.Errorf("Error countReminders %w", err)
 	}
-	var m models.Reminders
-text += strconv.Itoa(i) + m.Contennt + "\n"
-    
+	t := 0
+	for rows.Next() {
+		err := rows.Scan(&reminders.Contennt)
+		t++
+		if err != nil{
+			return "", fmt.Errorf("Error for getReminders %w", err)
+		}
+		text += strconv.Itoa(t) + reminders.Contennt + "\n"
+	}
     return text, nil
 	}
 
@@ -74,19 +88,25 @@ func (r *reminder) saveReminder(ctx context.Context,userID int64, reminder strin
 
 }
 
-func (r *reminder) writeReminder (ctx context.Context, userID int64, remind_at string, serialID int64) error {
+func (r *reminder) writeReminder (ctx context.Context, userID int64, remind_at string) error {
+
+	err, i := r.countReminders(ctx, userID)
+	serialID := models.Map_id[i]
+	if err != nil {
+		return fmt.Errorf("Error r.countReminders writeReminder %w", err)
+	}
 	userLocation := ""
 	row := r.db.QueryRow(ctx, "select timezone from users where id=$1", userID)
 	row.Scan(&userLocation)
 	loc, err := time.LoadLocation(userLocation)
 	if err != nil {
-		fmt.Errorf("Error time.LoadLocation writeReminder %w", err)
+	return fmt.Errorf("Error time.LoadLocation writeReminder %w", err)
 	}
 
-	parsed,err := time.ParseInLocation(remind_at, "15:00", loc)
+	parsed,err := time.ParseInLocation("15:04",remind_at, loc)
 
 	if err != nil {
-		fmt.Errorf("Error time.ParseInLocation writeReminder %w", err)
+		return fmt.Errorf("Error time.ParseInLocation writeReminder %w", err)
 	}
 
   now := time.Now().In(loc) //Need fix works only for today

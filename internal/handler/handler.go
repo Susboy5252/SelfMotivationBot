@@ -6,7 +6,6 @@ import (
 	"log"
 	"strings"
 	"motivator/internal/mytime"
-	"time"
 	"strconv"
 	
 
@@ -68,10 +67,10 @@ func (h *handler) Start() {
 			err := r.saveReminder(ctx,chatID, userText)
 			if err != nil {
 				fmt.Println(err)
-			}	
-			setUserState(chatID, "waiting_for_data_reminder")
-				msg.Text = fmt.Sprintf("✅ Remind is saved: %s", userText)
+			}
+	msg.Text = "Send time when you want to be reminded"
 				h.bot.Send(msg)
+			setUserState(chatID, "waiting_for_data_reminder")
 				return
                 
       case "waiting_for_plan": //Need to rework skip now
@@ -88,13 +87,18 @@ func (h *handler) Start() {
 					msg.Text = "Write a number of remind you want to delete"
 					h.bot.Send(msg)
 				}
-				err = r.deleteReminders(ctx, localID)
+				err = r.deleteReminders(ctx, localID, chatID)
 				if err != nil {
 					fmt.Println(err)
 				}
 				return
 			case "waiting_for_data_reminder":
+				msg.Text = "The remind is saved"
+				h.bot.Send(msg)
 				err := r.writeReminder(ctx, chatID, userText)
+				if err != nil {
+					fmt.Println(err)
+				}
 				clearUserState(chatID)
 				return
 			case "waiting_for_city":
@@ -171,7 +175,6 @@ func (h *handler) Start() {
 			if err != nil {
 				log.Println(err)
 			}
-			//	msg.Text = strings.Join(reminders, " ")
 			msg.Text = reminders
 			h.bot.Send(msg)
 			return
