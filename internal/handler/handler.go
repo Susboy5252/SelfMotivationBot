@@ -102,7 +102,7 @@ func (h *handler) Start() {
 				if err != nil {
 					fmt.Println(err) 
 				}
-				err = h.sendReminder(ctx, chatID, serialID, now, userLocation, msg)
+				err = h.sendReminder(ctx, serialID, now, userLocation, msg)
 				if err != nil {
 					fmt.Println(err)
 				}
@@ -197,7 +197,7 @@ func (h *handler) Start() {
 	}
  }
  
- func (h *handler) sendReminder (ctx context.Context, userID int64, serialID int64, sendTime time.Time, timezone string, msg tgbotapi.MessageConfig) error{
+ func (h *handler) sendReminder (ctx context.Context, serialID int64, sendTime time.Time, timezone string, msg tgbotapi.MessageConfig) error{
 		// Создаем планировщик
 	s, err := gocron.NewScheduler()
 	if err != nil {
