@@ -35,3 +35,18 @@ func (k *keyboard) lobbyMenu () {
 	msg.ReplyMarkup = keyboard
 	k.bot.Send(msg)
 }
+
+func (k *keyboard) remindersMenu (reminders string) {
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(
+	tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonData("➕ Добавить", "add_reminder"),
+	),
+	tgbotapi.NewInlineKeyboardRow(
+		tgbotapi.NewInlineKeyboardButtonData("📋 Мои", "my_reminders"),
+		tgbotapi.NewInlineKeyboardButtonData("⚙️ Настройки", "settings"),
+	),
+)
+msg := tgbotapi.NewMessage(k.userID, reminders)
+	msg.ReplyMarkup = keyboard
+k.bot.Send(msg)
+}

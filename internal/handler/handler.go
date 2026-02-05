@@ -140,6 +140,34 @@ func (h *handler) Start() {
     }
 	}
 
+	
+	switch update.Message.Text{
+	case "➕ Добавить напоминание":
+				msg.Text = "⏰ О чем тебе напомнить? Напиши текст напоминания."
+            h.bot.Send(msg)
+            setUserState(chatID, "waiting_for_reminder")
+            return
+	case "📋 Мои напоминания":
+			reminders, err := r.getReminders(ctx, chatID)
+			if err != nil {
+				log.Println(err)
+			}
+			k.remindersMenu(reminders)
+			return
+
+	case "⚙️ Настройки":
+		timeZone, err := t.GetUserTimeZone(ctx, chatID)
+		localTime, _ := mytime.GetUserLocalTimeZone(timeZone)
+		if err != nil {
+			log.Println(err)
+		}
+		msg.Text =  fmt.Sprintf("<b>Your time zone is </b>%s.\n<b>Your local time is </b>%s.\nIf that's not true, try to write your city with /time", timeZone, localTime)
+		h.bot.Send(msg)
+		return
+	}
+
+
+
  if update.Message.IsCommand(){
 
 	 user, err := u.GetUser(ctx, chatID)
@@ -166,14 +194,13 @@ func (h *handler) Start() {
 			setUserState(chatID, "waiting_for_city")
 			return
 		case "settings":
-		timeZone, err := t.GetUserTimeZone(ctx, chatID)
+					timeZone, err := t.GetUserTimeZone(ctx, chatID)
 		localTime, _ := mytime.GetUserLocalTimeZone(timeZone)
 		if err != nil {
 			log.Println(err)
 		}
 		msg.Text =  fmt.Sprintf("<b>Your time zone is </b>%s.\n<b>Your local time is </b>%s.\nIf that's not true, try to write your city with /time", timeZone, localTime)
 		h.bot.Send(msg)
-		return
 		case "remind":
 			msg.Text = "⏰ О чем тебе напомнить? Напиши текст напоминания."
             h.bot.Send(msg)
