@@ -57,6 +57,7 @@ func (h *handler) Start() {
 	c := newCity(h.conn)
 	t := mytime.New(h.conn)
 	r := newReminder(h.conn)
+	k := newKeyboard(h.bot, chatID)
 
 
 
@@ -134,7 +135,7 @@ func (h *handler) Start() {
 				}
 				msg.Text = fmt.Sprintf("<b>Your time zone is</b> %s.\n<b>Your local time is</b> %s.\nIf that's not true, try to write your city with /time", timez, localTime)
 				h.bot.Send(msg)
-				
+				k.lobbyMenu()
 				return
     }
 	}
@@ -156,8 +157,7 @@ func (h *handler) Start() {
 		case "plan":
 			msg.Text = "Tell me about your plans for today"
 		case "start":
-			msg.Text = "Hello User, please enter your city to find out your time zone"
-			h.bot.Send(msg)
+			k.emptyMenu()
 			setUserState(chatID, "waiting_for_city")
 			return
 		case "time":
