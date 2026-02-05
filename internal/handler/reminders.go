@@ -7,6 +7,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"strconv"
 	"motivator/models"
+	"github.com/olebedev/when"
+	"github.com/olebedev/when/rules/ru"
 )
 
 type reminder struct {
@@ -102,26 +104,20 @@ func (r *reminder) timeReminder (ctx context.Context, userID int64, remind_at st
 	if err != nil {
 	return 0, time.Time{}, "", fmt.Errorf("Error time.LoadLocation writeReminder %w", err)
 	}
+	
+	 now := time.Now().In(loc) //Need fix works only for today
 
-	parsed,err := time.ParseInLocation("15:04",remind_at, loc)
 
+		w := when.New(nil)
+
+	// добавляем правила русского языка
+	w.Add(ru.All...)
+
+	result, err := w.Parse(remind_at, now)
 	if err != nil {
-		return 0, time.Time{}, "", fmt.Errorf("Error time.ParseInLocation writeReminder %w", err)
+		return 0, time.Time{}, "", fmt.Errorf("Error w.Parse writeReminder %w", err)
 	}
-
-  now := time.Now().In(loc) //Need fix works only for today
-
-	result := time.Date(
-		now.Year(), now.Month(), now.Day(), parsed.Hour(), parsed.Minute(), 0, 0, loc,
-	)
-
-	_, err = r.db.Exec(ctx, "update reminders set remind_at=$1 where id=$2", result, serialID)
-	//content := ""
-	//row = r.db.QueryRow(ctx, "select content from reminders whereid=$1", serialID)
-	//err = row.Scan(&content)
-	//if err != nil {
-	//	return 0, time.Time{}, "", fmt.Errorf("Error row.Scan timeReminder %w", err)
-	//}
-
-	return serialID, result, userLocation, nil
+	_, err = r.db.Exec(ctx, "update reminders set remind_at=$1 where id=$2", result.Time, serialID)
+	return serialID,
+	result.Time, userLocation, nil
 }

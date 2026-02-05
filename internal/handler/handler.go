@@ -71,7 +71,8 @@ func (h *handler) Start() {
 			if err != nil {
 				fmt.Println(err)
 			}
-	msg.Text = "Send time when you want to be reminded"
+	msg.Text = "Send time when you want to be reminded. <b>Now understands only russain</b>. Example\nсегодня в 16:00, завтра в 9\n" +
+	"через 10 минут, через 2 часа\n5 февраля в 14:00, 12.03.2026 в 10"
 				h.bot.Send(msg)
 			setUserState(chatID, "waiting_for_data_reminder")
 				return
