@@ -73,7 +73,7 @@ func (r *reminder) getReminders(ctx context.Context, userID int64) (string, erro
 		if err != nil{
 			return "", fmt.Errorf("Error for getReminders %w", err)
 		}
-		text += strconv.Itoa(t) + reminders.Contennt + "\n"
+		text += strconv.Itoa(t) + " " + reminders.Contennt + "\n"
 	}
     return text, nil
 	}

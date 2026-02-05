@@ -95,6 +95,8 @@ func (h *handler) Start() {
 				if err != nil {
 					fmt.Println(err)
 				}
+			msg.Text = "The remind was deleted"
+			h.bot.Send(msg)
 				return
 			case "waiting_for_data_reminder":
 				msg.Text = "The remind is saved"
@@ -190,8 +192,6 @@ func (h *handler) Start() {
 			msg.Text = "Write a number of remind you want to delete"
 			h.bot.Send(msg)
 			setUserState(chatID, "waiting_for_deleting_remind")
-			msg.Text = "The remind was deleted"
-			h.bot.Send(msg)
 			return
 		}
 		}
