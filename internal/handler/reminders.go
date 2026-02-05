@@ -88,25 +88,25 @@ func (r *reminder) saveReminder(ctx context.Context,userID int64, reminder strin
 
 }
 
-func (r *reminder) timeReminder (ctx context.Context, userID int64, remind_at string) error {
+func (r *reminder) timeReminder (ctx context.Context, userID int64, remind_at string) (int64, time.Time, string, error) {
 
 	err, i := r.countReminders(ctx, userID)
 	serialID := models.Map_id[i]
 	if err != nil {
-		return fmt.Errorf("Error r.countReminders writeReminder %w", err)
+		return 0, time.Time{}, "", fmt.Errorf("Error r.countReminders writeReminder %w", err)
 	}
 	userLocation := ""
 	row := r.db.QueryRow(ctx, "select timezone from users where id=$1", userID)
 	row.Scan(&userLocation)
 	loc, err := time.LoadLocation(userLocation)
 	if err != nil {
-	return fmt.Errorf("Error time.LoadLocation writeReminder %w", err)
+	return 0, time.Time{}, "", fmt.Errorf("Error time.LoadLocation writeReminder %w", err)
 	}
 
 	parsed,err := time.ParseInLocation("15:04",remind_at, loc)
 
 	if err != nil {
-		return fmt.Errorf("Error time.ParseInLocation writeReminder %w", err)
+		return 0, time.Time{}, "", fmt.Errorf("Error time.ParseInLocation writeReminder %w", err)
 	}
 
   now := time.Now().In(loc) //Need fix works only for today
@@ -116,5 +116,12 @@ func (r *reminder) timeReminder (ctx context.Context, userID int64, remind_at st
 	)
 
 	_, err = r.db.Exec(ctx, "update reminders set remind_at=$1 where id=$2", result, serialID)
-	return nil
+	//content := ""
+	//row = r.db.QueryRow(ctx, "select content from reminders whereid=$1", serialID)
+	//err = row.Scan(&content)
+	//if err != nil {
+	//	return 0, time.Time{}, "", fmt.Errorf("Error row.Scan timeReminder %w", err)
+	//}
+
+	return serialID, result, userLocation, nil
 }

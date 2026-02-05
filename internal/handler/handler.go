@@ -7,10 +7,13 @@ import (
 	"strings"
 	"motivator/internal/mytime"
 	"strconv"
+	"time"
 	
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/go-co-op/gocron/v2"
+
 )
 
 type handler struct {
@@ -95,7 +98,11 @@ func (h *handler) Start() {
 			case "waiting_for_data_reminder":
 				msg.Text = "The remind is saved"
 				h.bot.Send(msg)
-				err := r.timeReminder(ctx, chatID, userText)
+				serialID, now, userLocation, err := r.timeReminder(ctx, chatID, userText)
+				if err != nil {
+					fmt.Println(err) 
+				}
+				err = h.sendReminder(ctx, chatID, serialID, now, userLocation, msg)
 				if err != nil {
 					fmt.Println(err)
 				}
@@ -189,3 +196,39 @@ func (h *handler) Start() {
 		}
 	}
  }
+ 
+ func (h *handler) sendReminder (ctx context.Context, userID int64, serialID int64, sendTime time.Time, timezone string, msg tgbotapi.MessageConfig) error{
+		// Создаем планировщик
+	s, err := gocron.NewScheduler()
+	if err != nil {
+		return fmt.Errorf("Error gocron.NewSchedular sendReminder %w", err)
+	}
+
+	loc, err := time.LoadLocation(timezone)
+	if err != nil {
+	return fmt.Errorf("Error time.LoadLocation sendReminder %w", err)
+
+		// Запланировать на конкретную дату и время
+	}
+		var m string
+		futureTime := time.Date(sendTime.Year(), sendTime.Month(), sendTime.Day(), sendTime.Hour(), sendTime.Minute(), sendTime.Second(), 0, loc)
+		row := h.conn.QueryRow(ctx, "select content from reminders where id=$1", serialID)
+		err = row.Scan(&m)
+		msg.Text = m
+		if err != nil {
+			return fmt.Errorf("Error row.Scan sendReminder %w", err)
+		}
+	_, err = s.NewJob(
+		gocron.OneTimeJob(
+			gocron.OneTimeJobStartDateTime(futureTime),
+		),
+		gocron.NewTask(h.bot.Send, msg),
+	)
+	if err != nil {
+		return fmt.Errorf("Error s.NewJob sendReminder %w", err)
+	}
+	
+	// Запускаем планировщик
+	s.Start()
+	return nil
+}
