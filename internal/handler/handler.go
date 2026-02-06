@@ -140,6 +140,29 @@ func (h *handler) Start() {
     }
 	}
 
+
+if update.CallbackQuery != nil {
+    cb := update.CallbackQuery
+	data := cb.Data // callback_data
+
+	// ОБЯЗАТЕЛЬНО ответить Telegram
+	h.bot.Request(tgbotapi.NewCallback(cb.ID, ""))
+
+	switch data {
+
+	case "add_reminder":
+		msg.Text = "works1"
+		h.bot.Send(msg)
+
+	case "my_reminders":
+		msg.Text = "works2"
+		h.bot.Send(msg)
+	case "settings":
+		msg.Text = "works3"
+		h.bot.Send(msg)}
+}
+
+
 	
 	switch update.Message.Text{
 	case "➕ Добавить напоминание":
