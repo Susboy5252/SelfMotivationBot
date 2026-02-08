@@ -14,6 +14,10 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+var (
+	globalIndex int
+)
+
 type handler struct {
 	bot  *tgbotapi.BotAPI
 	conn *pgxpool.Pool
@@ -48,36 +52,58 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 		cb := update.CallbackQuery
 		msg := tgbotapi.NewMessage(cb.Message.Chat.ID, "")
 		data := cb.Data
+		ctx := context.Background()
+		r := newReminder(h.conn)
+		k := newKeyboard(h.bot, cb.Message.Chat.ID)
 
-		selectedMenu := selectedMenu()
-
-		// ОБЯЗАТЕЛЬНО ответить Telegram
 		h.bot.Request(tgbotapi.NewCallback(cb.ID, ""))
 
-		switch data {
-
-		case "add_reminder":
+		if strings.HasPrefix(data, "remind_") {
+			indexStr := strings.TrimPrefix(data, "remind_")
+			index, err := strconv.Atoi(indexStr)
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+			globalIndex = index + 1
+			err, selectedKeyboard, remindNumber := selectedMenu(ctx, h.conn, index)
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
 			edit := tgbotapi.NewEditMessageText(
 				cb.Message.Chat.ID,
 				cb.Message.MessageID,
-				"Выбери действие:")
-			edit.ReplyMarkup = &selectedMenu
+				remindNumber)
+			edit.ReplyMarkup = &selectedKeyboard
 			h.bot.Send(edit)
-
-		case "my_reminders":
-			msg.Text = "works2"
-			h.bot.Send(msg)
-		case "settings":
-			msg.Text = "works3"
-			h.bot.Send(msg)
-
-		case "delete_reminder":
-
 		}
 
-		return
-	}
+		switch data {
 
+		case "delete_reminder":
+			r.deleteReminders(ctx, globalIndex, cb.Message.Chat.ID)
+			return
+
+		case "back_to_reminders":
+			reminders, err, allReminders := r.getReminders(ctx, cb.Message.Chat.ID)
+			if err != nil {
+				log.Println(err)
+			}
+			keyboard := k.remindersMenu(allReminders, 0)
+			edit := tgbotapi.NewEditMessageText(
+				cb.Message.Chat.ID,
+				cb.Message.MessageID,
+				reminders)
+			edit.ReplyMarkup = &keyboard
+			h.bot.Send(edit)
+
+			msg.ReplyMarkup = keyboard
+			k.bot.Send(msg)
+
+			return
+		}
+	}
 	if update.Message != nil {
 		log.Printf("[%s] %s", update.Message.From.UserName, update.Message.Text)
 
@@ -181,7 +207,10 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 			if err != nil {
 				log.Println(err)
 			}
-			k.remindersMenu(reminders, allReminders)
+			keyboard := k.remindersMenu(allReminders, 0)
+			msg.Text = reminders
+			msg.ReplyMarkup = keyboard
+			h.bot.Send(msg)
 			return
 
 		case "⚙️ Настройки":

@@ -1,9 +1,13 @@
 package handler
 
 import (
+	"context"
 	"fmt"
+	"motivator/models"
+	"strconv"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type keyboard struct {
@@ -40,30 +44,43 @@ func (k *keyboard) lobbyMenu() {
 	k.bot.Send(msg)
 }
 
-func (k *keyboard) remindersMenu(reminders string, allreminders []string) {
-
+func (k *keyboard) remindersMenu(allreminders []string, page int) tgbotapi.InlineKeyboardMarkup {
 	maxButtons := 7
-	if len(allreminders) > maxButtons {
-		allreminders = allreminders[:maxButtons]
+	start := page
+	end := page + maxButtons
+	if end > len(allreminders) {
+		end = len(allreminders)
+	}
+	showReminders := allreminders[start:end]
+	row := make([]tgbotapi.InlineKeyboardButton, len(showReminders))
+	for i := range showReminders {
+		row[i] = tgbotapi.NewInlineKeyboardButtonData(strconv.Itoa(page+i+1), fmt.Sprintf("remind_%d", i))
+	}
+	keyboardRows := [][]tgbotapi.InlineKeyboardButton{row}
+
+	if len(allreminders) > end {
+		keyboardRows = append(keyboardRows, tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("Далее", fmt.Sprintf("remind_%d", end))))
 	}
 
-	row := make([]tgbotapi.InlineKeyboardButton, len(allreminders))
-	for i, reminder := range allreminders {
-		// каждая кнопка в своей строке
-		row[i] = tgbotapi.NewInlineKeyboardButtonData(reminder, fmt.Sprintf("remind_%d", i))
-	}
-	keyboard := tgbotapi.NewInlineKeyboardMarkup(row)
-	msg := tgbotapi.NewMessage(k.userID, reminders)
-	msg.ReplyMarkup = keyboard
-	k.bot.Send(msg)
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(keyboardRows...)
 
+	return keyboard
 }
 
-func selectedMenu() tgbotapi.InlineKeyboardMarkup {
+func selectedMenu(ctx context.Context, db *pgxpool.Pool, remindNumber int) (error, tgbotapi.InlineKeyboardMarkup, string) {
+	result := ""
+	serialID := models.Map_id[remindNumber+1]
+	row := db.QueryRow(ctx, "select content from reminders where id=$1", serialID)
+	err := row.Scan(&result)
+	if err != nil {
+		return fmt.Errorf("Erorr row.scan selectedMenu %w", err),
+			tgbotapi.InlineKeyboardMarkup{}, ""
+	}
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData("Удалить", "delete_reminder"),
+			tgbotapi.NewInlineKeyboardButtonData("Назад ->", "back_to_reminders"),
 		),
 	)
-	return keyboard
+	return nil, keyboard, result
 }
