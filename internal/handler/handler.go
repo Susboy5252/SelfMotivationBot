@@ -156,16 +156,33 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 				h.bot.Send(msg)
 				return
 			case "waiting_for_data_reminder":
-				msg.Text = "The remind is saved"
-				h.bot.Send(msg)
+
 				serialID, now, userLocation, err := r.timeReminder(ctx, chatID, userText)
 				if err != nil {
 					fmt.Println(err)
 				}
 				err = h.sendReminder(ctx, serialID, now, userLocation, msg)
 				if err != nil {
+					if strings.Contains(err.Error(), "start must not be in the past") {
+						msg.Text = "Время которе вы указали, уже прошло, введите будущее время"
+						h.bot.Send(msg)
+						fmt.Println(chatID)
+						setUserState(chatID, "waiting_for_data_reminder")
+						fmt.Println(err)
+						return
+					}
+
+					msg.Text = "Простите, мы не смогли вас понять. Попробуйте отправить новое сообщение когда вы будете уведолмлены\n" +
+						"Примеры:\n" +
+						"сегодня в 16:00, завтра в 9\nчерез 10 минут, через 2 часа\n5 февраля в 14:00, 12.03.2026 в 10"
+					h.bot.Send(msg)
+					fmt.Println(chatID)
+					setUserState(chatID, "waiting_for_data_reminder")
 					fmt.Println(err)
+					return
 				}
+				msg.Text = "The remind is saved"
+				h.bot.Send(msg)
 				clearUserState(chatID)
 				return
 			case "waiting_for_city":
@@ -300,7 +317,9 @@ func (h *handler) sendReminder(ctx context.Context, serialID int64, sendTime tim
 	err = row.Scan(&m)
 	msg.Text = m
 	if err != nil {
-		return fmt.Errorf("Error row.Scan sendReminder %w", err)
+
+		return err
+
 	}
 	_, err = s.NewJob(
 		gocron.OneTimeJob(

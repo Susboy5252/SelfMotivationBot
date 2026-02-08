@@ -108,18 +108,19 @@ func (r *reminder) timeReminder(ctx context.Context, userID int64, remind_at str
 		return 0, time.Time{}, "", fmt.Errorf("Error time.LoadLocation writeReminder %w", err)
 	}
 
-	now := time.Now().In(loc) //Need fix works only for today
+	now := time.Now().In(loc)
 
 	w := when.New(nil)
 
-	// добавляем правила русского языка
 	w.Add(ru.All...)
 
 	result, err := w.Parse(remind_at, now)
 	if err != nil {
 		return 0, time.Time{}, "", fmt.Errorf("Error w.Parse writeReminder %w", err)
 	}
+	if result == nil {
+		return 0, time.Time{}, "", nil
+	}
 	_, err = r.db.Exec(ctx, "update reminders set remind_at=$1 where id=$2", result.Time, serialID)
-	return serialID,
-		result.Time, userLocation, nil
+	return serialID, result.Time, userLocation, nil
 }
