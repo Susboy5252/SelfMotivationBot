@@ -19,4 +19,5 @@ type Reminders struct {
 	Serial_id int64
 	Local_id  int
 	Content   string
+	Time time.Time
 }

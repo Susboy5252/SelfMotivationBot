@@ -85,8 +85,8 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 				fmt.Println(err)
 				return
 			}
-			_, err, allReminders := r.getReminders(ctx, cb.Message.Chat.ID)
-				text, keyboard := k.remindersMenu(allReminders, index)
+			allTime, err, allReminders := r.getReminders(ctx, cb.Message.Chat.ID)
+				text, keyboard := k.remindersMenu(allReminders, allTime, index)
 				edit := tgbotapi.NewEditMessageText(
 				cb.Message.Chat.ID,
 				cb.Message.MessageID,
@@ -103,8 +103,8 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 				fmt.Println(err)
 				return
 			}
-			_, err, allReminders := r.getReminders(ctx, cb.Message.Chat.ID)
-			text,keyboard := k.remindersMenu(allReminders, index-7)
+			allTime, err, allReminders := r.getReminders(ctx, cb.Message.Chat.ID)
+			text,keyboard := k.remindersMenu(allReminders, allTime, index-7)
 				edit := tgbotapi.NewEditMessageText(
 				cb.Message.Chat.ID,
 				cb.Message.MessageID,
@@ -122,11 +122,11 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 			return
 
 		case "back_to_reminders":
-			_, err, allReminders := r.getReminders(ctx, cb.Message.Chat.ID)
+			allTime, err, allReminders := r.getReminders(ctx, cb.Message.Chat.ID)
 			if err != nil {
 				log.Println(err)
 			}
-			text, keyboard := k.remindersMenu(allReminders, 0)
+			text, keyboard := k.remindersMenu(allReminders,allTime, 0)
 			edit := tgbotapi.NewEditMessageText(
 				cb.Message.Chat.ID,
 				cb.Message.MessageID,
@@ -224,6 +224,7 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 					return
 				}
 				msg.Text = "The remind is saved"
+				k.lobbyMenu()
 				h.bot.Send(msg)
 				clearUserState(chatID)
 				return
@@ -265,11 +266,11 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 			return
 
 		case "📋 Мои напоминания":
-			_, err, allReminders := r.getReminders(ctx, chatID)
+			allTime, err, allReminders := r.getReminders(ctx, chatID)
 			if err != nil {
 				log.Println(err)
 			}
-			text, keyboard := k.remindersMenu(allReminders, 0)
+			text, keyboard := k.remindersMenu(allReminders, allTime, 0)
 			msg.Text = text
 			msg.ReplyMarkup = keyboard
 			h.bot.Send(msg)
@@ -300,8 +301,6 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 			}
 
 			switch update.Message.Command() {
-			case "plan":
-				msg.Text = "Tell me about your plans for today"
 			case "start":
 				k.emptyMenu()
 				setUserState(chatID, "waiting_for_city")
@@ -310,33 +309,6 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 				msg.Text = "Please enter your city to find out your time zone"
 				h.bot.Send(msg)
 				setUserState(chatID, "waiting_for_city")
-				return
-			case "settings":
-				timeZone, err := t.GetUserTimeZone(ctx, chatID)
-				localTime, _ := mytime.GetUserLocalTimeZone(timeZone)
-				if err != nil {
-					log.Println(err)
-				}
-				msg.Text = fmt.Sprintf("<b>Your time zone is </b>%s.\n<b>Your local time is </b>%s.\nIf that's not true, try to write your city with /time", timeZone, localTime)
-				h.bot.Send(msg)
-			case "remind":
-				msg.Text = "⏰ О чем тебе напомнить? Напиши текст напоминания."
-				h.bot.Send(msg)
-				setUserState(chatID, "waiting_for_reminder")
-				return
-			case "getremind":
-
-				reminders, err, _ := r.getReminders(ctx, chatID)
-				if err != nil {
-					log.Println(err)
-				}
-				msg.Text = reminders
-				h.bot.Send(msg)
-				return
-			case "delete":
-				msg.Text = "Write a number of remind you want to delete"
-				h.bot.Send(msg)
-				setUserState(chatID, "waiting_for_deleting_remind")
 				return
 			}
 		}

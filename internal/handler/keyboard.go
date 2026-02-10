@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"time"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -44,7 +45,7 @@ func (k *keyboard) lobbyMenu() {
 	k.bot.Send(msg)
 }
 
-func (k *keyboard) remindersMenu(allreminders []string, page int) (string, tgbotapi.InlineKeyboardMarkup) {
+func (k *keyboard) remindersMenu(allreminders []string, allTime []time.Time, page int) (string, tgbotapi.InlineKeyboardMarkup) {
 	maxButtons := 7
 	start := page
 	end := min(page+maxButtons, len(allreminders))
@@ -54,7 +55,7 @@ func (k *keyboard) remindersMenu(allreminders []string, page int) (string, tgbot
 	text := ""
 
 	for i := range showReminders {
-		text += strconv.Itoa(i+page+1) + " " + showReminders[i] +"\n"
+		text += strconv.Itoa(i+page+1) + " " + showReminders[i] + " " + allTime[i].Format("02.01.2006 15:04") + "\n"
 
 		row[i] = tgbotapi.NewInlineKeyboardButtonData(strconv.Itoa(page+i+1), fmt.Sprintf("remindme_%d", page+i))
 	}

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"motivator/models"
-	"strconv"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -54,31 +53,31 @@ func (r *reminder) countReminders(ctx context.Context, userID int64) (error, int
 	}
 	return nil, i
 }
-func (r *reminder) getReminders(ctx context.Context, userID int64) (string, error, []string) {
+func (r *reminder) getReminders(ctx context.Context, userID int64) ([]time.Time, error, []string) {
 	var allReminders []string
-	text := ""
+	var allTime []time.Time
 	var reminders models.Reminders
-	query := "Select content from reminders where user_id=$1"
+	query := "Select content, remind_at from reminders where user_id=$1"
 	rows, err := r.db.Query(ctx, query, userID)
 	if err != nil {
-		return "", fmt.Errorf("Error h.pool.Query countReminders %w", err), []string{}
+		return []time.Time{}, fmt.Errorf("Error h.pool.Query countReminders %w", err), []string{}
 	}
 	defer rows.Close()
 	err, _ = r.countReminders(ctx, userID)
 	if err != nil {
-		return "Error", fmt.Errorf("Error countReminders %w", err), []string{}
+		return []time.Time{}, fmt.Errorf("Error countReminders %w", err), []string{}
 	}
 	t := 0
 	for rows.Next() {
-		err := rows.Scan(&reminders.Content)
+		err := rows.Scan(&reminders.Content, &reminders.Time)
 		t++
 		if err != nil {
-			return "", fmt.Errorf("Error for getReminders %w", err), []string{}
+			return []time.Time{}, fmt.Errorf("Error for getReminders %w", err), []string{}
 		}
 		allReminders = append(allReminders, reminders.Content)
-		text += strconv.Itoa(t) + " " + reminders.Content + "\n"
+		allTime = append(allTime, reminders.Time)
 	}
-	return text, nil, allReminders
+	return allTime, nil, allReminders
 }
 
 func (r *reminder) saveReminder(ctx context.Context, userID int64, reminder string) error {
