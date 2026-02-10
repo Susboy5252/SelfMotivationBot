@@ -96,3 +96,16 @@ func selectedMenu(ctx context.Context, db *pgxpool.Pool, remindNumber int) (erro
 	)
 	return nil, keyboard, result
 }
+
+func (k *keyboard) Back(text string) {
+	keyboard := tgbotapi.NewReplyKeyboard(
+		tgbotapi.NewKeyboardButtonRow(
+			tgbotapi.NewKeyboardButton("⬅️ Вернуться"),
+		),
+	)
+
+	msg := tgbotapi.NewMessage(k.userID, text)
+	msg.ReplyMarkup = keyboard
+	k.bot.Send(msg)
+}
+

@@ -161,6 +161,11 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 		if currentState != "" {
 			switch currentState {
 			case "waiting_for_reminder":
+				if userText == "⬅️ Вернуться"{
+					clearUserState(chatID)
+					k.lobbyMenu()
+					return
+				}
 				err := r.saveReminder(ctx, chatID, userText)
 				if err != nil {
 					fmt.Println(err)
@@ -251,11 +256,14 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 		}
 
 		switch update.Message.Text {
+
+
 		case "➕ Добавить напоминание":
-			msg.Text = "⏰ О чем тебе напомнить? Напиши текст напоминания."
+			k.Back("⏰ О чем тебе напомнить? Напиши текст напоминания.")
 			h.bot.Send(msg)
 			setUserState(chatID, "waiting_for_reminder")
 			return
+
 		case "📋 Мои напоминания":
 			_, err, allReminders := r.getReminders(ctx, chatID)
 			if err != nil {
