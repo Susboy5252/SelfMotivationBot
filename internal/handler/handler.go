@@ -224,8 +224,8 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 					return
 				}
 				msg.Text = "The remind is saved"
-				k.lobbyMenu()
 				h.bot.Send(msg)
+				k.lobbyMenu()
 				clearUserState(chatID)
 				return
 			case "waiting_for_city":
