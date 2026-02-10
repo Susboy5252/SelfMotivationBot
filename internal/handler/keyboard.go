@@ -44,13 +44,18 @@ func (k *keyboard) lobbyMenu() {
 	k.bot.Send(msg)
 }
 
-func (k *keyboard) remindersMenu(allreminders []string, page int) tgbotapi.InlineKeyboardMarkup {
+func (k *keyboard) remindersMenu(allreminders []string, page int) (string, tgbotapi.InlineKeyboardMarkup) {
 	maxButtons := 7
 	start := page
 	end := min(page+maxButtons, len(allreminders))
 	showReminders := allreminders[start:end]
 	row := make([]tgbotapi.InlineKeyboardButton, len(showReminders))
+
+	text := ""
+
 	for i := range showReminders {
+		text += strconv.Itoa(i+page+1) + " " + showReminders[i] +"\n"
+
 		row[i] = tgbotapi.NewInlineKeyboardButtonData(strconv.Itoa(page+i+1), fmt.Sprintf("remindme_%d", page+i))
 	}
 	keyboardRows := [][]tgbotapi.InlineKeyboardButton{row}
@@ -69,7 +74,9 @@ func (k *keyboard) remindersMenu(allreminders []string, page int) tgbotapi.Inlin
 
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(keyboardRows...)
 
-	return keyboard
+	text+= "\n<b>Выберите число которое хотите открыть</b>"
+
+	return text, keyboard
 }
 
 func selectedMenu(ctx context.Context, db *pgxpool.Pool, remindNumber int) (error, tgbotapi.InlineKeyboardMarkup, string) {

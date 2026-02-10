@@ -85,13 +85,14 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 				fmt.Println(err)
 				return
 			}
-			reminders, err, allReminders := r.getReminders(ctx, cb.Message.Chat.ID)
-				keyboard := k.remindersMenu(allReminders, index)
+			_, err, allReminders := r.getReminders(ctx, cb.Message.Chat.ID)
+				text, keyboard := k.remindersMenu(allReminders, index)
 				edit := tgbotapi.NewEditMessageText(
 				cb.Message.Chat.ID,
 				cb.Message.MessageID,
-				reminders)
+				text)
 			edit.ReplyMarkup = &keyboard
+			edit.ParseMode = tgbotapi.ModeHTML
 			h.bot.Send(edit)
 		}
 			if strings.HasPrefix(data, "remind_back") {
@@ -102,13 +103,14 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 				fmt.Println(err)
 				return
 			}
-			reminders, err, allReminders := r.getReminders(ctx, cb.Message.Chat.ID)
-				keyboard := k.remindersMenu(allReminders, index-7)
+			_, err, allReminders := r.getReminders(ctx, cb.Message.Chat.ID)
+			text,keyboard := k.remindersMenu(allReminders, index-7)
 				edit := tgbotapi.NewEditMessageText(
 				cb.Message.Chat.ID,
 				cb.Message.MessageID,
-				reminders)
+				text)
 			edit.ReplyMarkup = &keyboard
+			edit.ParseMode = tgbotapi.ModeHTML
 			h.bot.Send(edit)
 		}
 
@@ -120,16 +122,17 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 			return
 
 		case "back_to_reminders":
-			reminders, err, allReminders := r.getReminders(ctx, cb.Message.Chat.ID)
+			_, err, allReminders := r.getReminders(ctx, cb.Message.Chat.ID)
 			if err != nil {
 				log.Println(err)
 			}
-			keyboard := k.remindersMenu(allReminders, 0)
+			text, keyboard := k.remindersMenu(allReminders, 0)
 			edit := tgbotapi.NewEditMessageText(
 				cb.Message.Chat.ID,
 				cb.Message.MessageID,
-				reminders)
+				text)
 			edit.ReplyMarkup = &keyboard
+			edit.ParseMode = tgbotapi.ModeHTML
 			h.bot.Send(edit)
 
 			msg.ReplyMarkup = keyboard
@@ -254,12 +257,12 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 			setUserState(chatID, "waiting_for_reminder")
 			return
 		case "📋 Мои напоминания":
-			reminders, err, allReminders := r.getReminders(ctx, chatID)
+			_, err, allReminders := r.getReminders(ctx, chatID)
 			if err != nil {
 				log.Println(err)
 			}
-			keyboard := k.remindersMenu(allReminders, 0)
-			msg.Text = reminders
+			text, keyboard := k.remindersMenu(allReminders, 0)
+			msg.Text = text
 			msg.ReplyMarkup = keyboard
 			h.bot.Send(msg)
 			return
