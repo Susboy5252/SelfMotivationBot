@@ -94,7 +94,23 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 			edit.ReplyMarkup = &keyboard
 			h.bot.Send(edit)
 		}
-
+			if strings.HasPrefix(data, "remind_back") {
+			indexStr := strings.TrimPrefix(data, "remind_back_")
+			index, err := strconv.Atoi(indexStr)
+			fmt.Println(index)
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+			reminders, err, allReminders := r.getReminders(ctx, cb.Message.Chat.ID)
+				keyboard := k.remindersMenu(allReminders, index-7)
+				edit := tgbotapi.NewEditMessageText(
+				cb.Message.Chat.ID,
+				cb.Message.MessageID,
+				reminders)
+			edit.ReplyMarkup = &keyboard
+			h.bot.Send(edit)
+		}
 
 
 		switch data {

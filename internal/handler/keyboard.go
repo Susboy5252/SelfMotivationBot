@@ -55,8 +55,16 @@ func (k *keyboard) remindersMenu(allreminders []string, page int) tgbotapi.Inlin
 	}
 	keyboardRows := [][]tgbotapi.InlineKeyboardButton{row}
 
-	if len(allreminders) > end {
-		keyboardRows = append(keyboardRows, tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("Далее", fmt.Sprintf("remind_next_%d", end))))
+	if page <= 6 {
+				keyboardRows = append(keyboardRows, tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("Далее", fmt.Sprintf("remind_next_%d", end))))
+
+	}	
+
+	if page >= 7{
+		keyboardRows = append(keyboardRows, tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("Назад", fmt.Sprintf("remind_back_%d", page))))
+	}
+		if len(allreminders) > end && page >= 7 {
+		keyboardRows[len(keyboardRows)-1] = append(keyboardRows[len(keyboardRows)-1], tgbotapi.NewInlineKeyboardButtonData("Далее", fmt.Sprintf("remind_next_%d", end)))
 	}
 
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(keyboardRows...)
