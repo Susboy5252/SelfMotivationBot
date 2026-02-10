@@ -47,19 +47,16 @@ func (k *keyboard) lobbyMenu() {
 func (k *keyboard) remindersMenu(allreminders []string, page int) tgbotapi.InlineKeyboardMarkup {
 	maxButtons := 7
 	start := page
-	end := page + maxButtons
-	if end > len(allreminders) {
-		end = len(allreminders)
-	}
+	end := min(page+maxButtons, len(allreminders))
 	showReminders := allreminders[start:end]
 	row := make([]tgbotapi.InlineKeyboardButton, len(showReminders))
 	for i := range showReminders {
-		row[i] = tgbotapi.NewInlineKeyboardButtonData(strconv.Itoa(page+i+1), fmt.Sprintf("remind_%d", i))
+		row[i] = tgbotapi.NewInlineKeyboardButtonData(strconv.Itoa(page+i+1), fmt.Sprintf("remindme_%d", page+i))
 	}
 	keyboardRows := [][]tgbotapi.InlineKeyboardButton{row}
 
 	if len(allreminders) > end {
-		keyboardRows = append(keyboardRows, tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("Далее", fmt.Sprintf("remind_%d", end))))
+		keyboardRows = append(keyboardRows, tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("Далее", fmt.Sprintf("remind_next_%d", end))))
 	}
 
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(keyboardRows...)

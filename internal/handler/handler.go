@@ -58,8 +58,8 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 
 		h.bot.Request(tgbotapi.NewCallback(cb.ID, ""))
 
-		if strings.HasPrefix(data, "remind_") {
-			indexStr := strings.TrimPrefix(data, "remind_")
+		if strings.HasPrefix(data, "remindme_") {
+			indexStr := strings.TrimPrefix(data, "remindme_")
 			index, err := strconv.Atoi(indexStr)
 			if err != nil {
 				fmt.Println(err)
@@ -78,6 +78,24 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 			edit.ReplyMarkup = &selectedKeyboard
 			h.bot.Send(edit)
 		}
+			if strings.HasPrefix(data, "remind_next") {
+			indexStr := strings.TrimPrefix(data, "remind_next_")
+			index, err := strconv.Atoi(indexStr)
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+			reminders, err, allReminders := r.getReminders(ctx, cb.Message.Chat.ID)
+				keyboard := k.remindersMenu(allReminders, index)
+				edit := tgbotapi.NewEditMessageText(
+				cb.Message.Chat.ID,
+				cb.Message.MessageID,
+				reminders)
+			edit.ReplyMarkup = &keyboard
+			h.bot.Send(edit)
+		}
+
+
 
 		switch data {
 
