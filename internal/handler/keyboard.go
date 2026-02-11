@@ -5,15 +5,18 @@ import (
 	"fmt"
 	"motivator/models"
 	"strconv"
+	"sync"
+
+	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"time"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type keyboard struct {
 	bot    *tgbotapi.BotAPI
 	userID int64
+	mu sync.RWMutex
 }
 
 func newKeyboard(bot *tgbotapi.BotAPI, userID int64) *keyboard {
@@ -61,7 +64,7 @@ func (k *keyboard) remindersMenu(allreminders []string, allTime []time.Time, pag
 	}
 	keyboardRows := [][]tgbotapi.InlineKeyboardButton{row}
 
-	if page <= 6 {
+	if len(allreminders) >= 8 && page <= 6  {
 				keyboardRows = append(keyboardRows, tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("Далее", fmt.Sprintf("remind_next_%d", end))))
 
 	}	
@@ -80,9 +83,11 @@ func (k *keyboard) remindersMenu(allreminders []string, allTime []time.Time, pag
 	return text, keyboard
 }
 
-func selectedMenu(ctx context.Context, db *pgxpool.Pool, remindNumber int) (error, tgbotapi.InlineKeyboardMarkup, string) {
+func (k *keyboard) selectedMenu(ctx context.Context, db *pgxpool.Pool, remindNumber int) (error, tgbotapi.InlineKeyboardMarkup, string) {
 	result := ""
+	k.mu.Lock()
 	serialID := models.Map_id[remindNumber+1]
+	defer k.mu.Unlock()
 	row := db.QueryRow(ctx, "select content from reminders where id=$1", serialID)
 	err := row.Scan(&result)
 	if err != nil {

@@ -66,7 +66,7 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 				return
 			}
 			globalIndex = index + 1
-			err, selectedKeyboard, remindNumber := selectedMenu(ctx, h.conn, index)
+			err, selectedKeyboard, remindNumber := k.selectedMenu(ctx, h.conn, index)
 			if err != nil {
 				fmt.Println(err)
 				return
