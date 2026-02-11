@@ -116,13 +116,12 @@ func (k *keyboard) Back(text string) {
 }
 
 
-func (k *keyboard) sureDelete () {
+func (k *keyboard) sureDelete () tgbotapi.InlineKeyboardMarkup {
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData("Да", "sure_delete"),
 			tgbotapi.NewInlineKeyboardButtonData("Нет", "back_to_reminders"),
 		),
 	)
-	msg := tgbotapi.NewMessage(k.userID,  "Вы точно хотите удалить заметку?")
-	msg.ReplyMarkup = keyboard
+	return keyboard
 }

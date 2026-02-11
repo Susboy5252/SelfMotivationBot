@@ -102,7 +102,7 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 			if err != nil {
 				fmt.Println(err)
 				return
-			}
+}
 			allTime, err, allReminders := r.getReminders(ctx, cb.Message.Chat.ID)
 			text,keyboard := k.remindersMenu(allReminders, allTime, index-7)
 				edit := tgbotapi.NewEditMessageText(
@@ -118,12 +118,19 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 		switch data {
 
 		case "delete_reminder":
-			k.sureDelete()
-			msg.Text = "tesssst"
-			h.bot.Send(msg)
+			keyboard := k.sureDelete()
+			edit := tgbotapi.NewEditMessageText(
+	cb.Message.Chat.ID,
+				cb.Message.MessageID,
+				"Вы точно хотите удалить заметку?",
+			)
+			edit.ReplyMarkup = &keyboard
+			h.bot.Send(edit)
 			return
 		case "sure_delete":
 					r.deleteReminders(ctx, globalIndex, cb.Message.Chat.ID)
+					msg.Text = "Заметка удалена"
+					h.bot.Send(msg)
 		return
 		case "back_to_reminders":
 			allTime, err, allReminders := r.getReminders(ctx, cb.Message.Chat.ID)
