@@ -118,9 +118,13 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 		switch data {
 
 		case "delete_reminder":
-			r.deleteReminders(ctx, globalIndex, cb.Message.Chat.ID)
+			k.sureDelete()
+			msg.Text = "tesssst"
+			h.bot.Send(msg)
 			return
-
+		case "sure_delete":
+					r.deleteReminders(ctx, globalIndex, cb.Message.Chat.ID)
+		return
 		case "back_to_reminders":
 			allTime, err, allReminders := r.getReminders(ctx, cb.Message.Chat.ID)
 			if err != nil {
