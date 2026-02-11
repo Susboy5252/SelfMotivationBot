@@ -50,7 +50,7 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 
 	if update.CallbackQuery != nil {
 		cb := update.CallbackQuery
-		msg := tgbotapi.NewMessage(cb.Message.Chat.ID, "")
+		//msg := tgbotapi.NewMessage(cb.Message.Chat.ID, "")
 		data := cb.Data
 		ctx := context.Background()
 		r := newReminder(h.conn)
@@ -129,27 +129,10 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 			return
 		case "sure_delete":
 					r.deleteReminders(ctx, globalIndex, cb.Message.Chat.ID)
-					msg.Text = "Заметка удалена"
-					h.bot.Send(msg)
+					h.backToReminders(ctx, cb, r, k)
 		return
 		case "back_to_reminders":
-			allTime, err, allReminders := r.getReminders(ctx, cb.Message.Chat.ID)
-			if err != nil {
-				log.Println(err)
-			}
-			text, keyboard := k.remindersMenu(allReminders,allTime, 0)
-			edit := tgbotapi.NewEditMessageText(
-				cb.Message.Chat.ID,
-				cb.Message.MessageID,
-				text)
-			edit.ReplyMarkup = &keyboard
-			edit.ParseMode = tgbotapi.ModeHTML
-			h.bot.Send(edit)
-
-			msg.ReplyMarkup = keyboard
-			k.bot.Send(msg)
-
-			return
+			h.backToReminders(ctx, cb, r, k)
 		}
 	}
 	if update.Message != nil {
@@ -362,4 +345,20 @@ func (h *handler) sendReminder(ctx context.Context, serialID int64, sendTime tim
 	// Запускаем планировщик
 	s.Start()
 	return nil
+}
+
+func (h *handler) backToReminders (ctx context.Context, cb *tgbotapi.CallbackQuery, r *reminder, k *keyboard) {
+			allTime, err, allReminders := r.getReminders(ctx, cb.Message.Chat.ID)
+			if err != nil {
+				log.Println(err)
+			}
+			text, keyboard := k.remindersMenu(allReminders,allTime, 0)
+			edit := tgbotapi.NewEditMessageText(
+				cb.Message.Chat.ID,
+				cb.Message.MessageID,
+				text)
+			edit.ReplyMarkup = &keyboard
+			edit.ParseMode = tgbotapi.ModeHTML
+			h.bot.Send(edit)
+			
 }
