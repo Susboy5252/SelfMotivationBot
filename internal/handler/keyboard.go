@@ -58,8 +58,12 @@ func (k *keyboard) remindersMenu(allreminders []string, allTime []time.Time, pag
 	text := ""
 
 	for i := range showReminders {
-		text += strconv.Itoa(i+page+1) + " " + showReminders[i] + " " + allTime[i].Format("02.01.2006 15:04") + "\n"
 
+		if allTime[i].IsZero() {
+					text += strconv.Itoa(i+page+1) + " " + showReminders[i] + " Заметка"+ "\n"
+		}	else {
+		text += strconv.Itoa(i+page+1) + " " + showReminders[i] + " " + allTime[i].Format("02.01.2006 15:04") + "\n"
+	}
 		row[i] = tgbotapi.NewInlineKeyboardButtonData(strconv.Itoa(page+i+1), fmt.Sprintf("remindme_%d", page+i))
 	}
 	keyboardRows := [][]tgbotapi.InlineKeyboardButton{row}
@@ -137,6 +141,7 @@ func (k *keyboard) saveNote(text string) {
 		),
 	)
 		msg := tgbotapi.NewMessage(k.userID, text)
+		msg.ParseMode = tgbotapi.ModeHTML
 		msg.ReplyMarkup = keyboard
 		k.bot.Send(msg)
 }
