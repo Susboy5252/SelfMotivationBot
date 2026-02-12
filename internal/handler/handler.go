@@ -160,13 +160,12 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 					k.lobbyMenu()
 					return
 				}
+				k.saveNote("Send time when you want to be reminded. <b>Now understands only russain</b>. Example\nсегодня в 16:00, завтра в 9\n" +
+					"через 10 минут, через 2 часа\n5 февраля в 14:00, 12.03.2026 в 10")
 				err := r.saveReminder(ctx, chatID, userText)
 				if err != nil {
 					fmt.Println(err)
 				}
-				msg.Text = "Send time when you want to be reminded. <b>Now understands only russain</b>. Example\nсегодня в 16:00, завтра в 9\n" +
-					"через 10 минут, через 2 часа\n5 февраля в 14:00, 12.03.2026 в 10"
-				h.bot.Send(msg)
 				setUserState(chatID, "waiting_for_data_reminder")
 				return
 
@@ -192,7 +191,14 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 				h.bot.Send(msg)
 				return
 			case "waiting_for_data_reminder":
-
+			if(userText == "Сохранить как заметку") {
+					r.timeReminder(ctx, chatID, "")
+					msg.Text = "Сохранено как заметку"
+					h.bot.Send(msg)
+					clearUserState(chatID)
+					k.lobbyMenu()
+					return
+			}
 				serialID, now, userLocation, err := r.timeReminder(ctx, chatID, userText)
 				if err != nil {
 					fmt.Println(err)
@@ -323,7 +329,6 @@ func (h *handler) sendReminder(ctx context.Context, serialID int64, sendTime tim
 		// Запланировать на конкретную дату и время
 	}
 	var m string
-	futureTime := time.Date(sendTime.Year(), sendTime.Month(), sendTime.Day(), sendTime.Hour(), sendTime.Minute(), sendTime.Second(), 0, loc)
 	row := h.conn.QueryRow(ctx, "select content from reminders where id=$1", serialID)
 	err = row.Scan(&m)
 	msg.Text = m
@@ -332,12 +337,29 @@ func (h *handler) sendReminder(ctx context.Context, serialID int64, sendTime tim
 		return err
 
 	}
-	_, err = s.NewJob(
+	var check string
+	var result int
+		checkTime := time.Date(sendTime.Year(), sendTime.Month(), sendTime.Day(), sendTime.Hour(), sendTime.Minute(), 0, 0, loc)
+
+			_, err = s.NewJob(
 		gocron.OneTimeJob(
-			gocron.OneTimeJobStartDateTime(futureTime),
+			gocron.OneTimeJobStartDateTime(checkTime),
 		),
-		gocron.NewTask(h.bot.Send, msg),
+		gocron.NewTask(func() {
+				rowcheck := h.conn.QueryRow(ctx, "select content from reminders where id=$1", serialID)
+				err = rowcheck.Scan(&check)
+
+        result = strings.Compare(msg.Text, check)
+        fmt.Println("Compare result:", result)
+
+		if result == 0{
+			h.bot.Send(msg)
+		}
+    }),
 	)
+	if err != nil {
+		return fmt.Errorf("Error s.NewJob sendReminder %w", err)
+	}
 	if err != nil {
 		return fmt.Errorf("Error s.NewJob sendReminder %w", err)
 	}

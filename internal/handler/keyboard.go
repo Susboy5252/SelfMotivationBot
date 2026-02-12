@@ -78,6 +78,10 @@ func (k *keyboard) remindersMenu(allreminders []string, allTime []time.Time, pag
 
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(keyboardRows...)
 
+	if text == ""{
+		return "У вас еще нет напоминай, нажмите ➕ Добавить напоминание", keyboard
+	}
+
 	text+= "\n<b>Выберите число которое хотите открыть</b>"
 
 	return text, keyboard
@@ -124,4 +128,15 @@ func (k *keyboard) sureDelete () tgbotapi.InlineKeyboardMarkup {
 		),
 	)
 	return keyboard
+}
+
+func (k *keyboard) saveNote(text string) {
+		keyboard := tgbotapi.NewReplyKeyboard(
+		tgbotapi.NewKeyboardButtonRow(
+			tgbotapi.NewKeyboardButton("Сохранить как заметку"),
+		),
+	)
+		msg := tgbotapi.NewMessage(k.userID, text)
+		msg.ReplyMarkup = keyboard
+		k.bot.Send(msg)
 }

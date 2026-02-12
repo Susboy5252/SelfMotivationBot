@@ -6,7 +6,7 @@ import (
 	"motivator/models"
 	"sync"
 	"time"
-
+	"strings"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/olebedev/when"
 	"github.com/olebedev/when/rules/ru"
@@ -79,6 +79,9 @@ func (r *reminder) getReminders(ctx context.Context, userID int64) ([]time.Time,
 		err := rows.Scan(&reminders.Content, &reminders.Time)
 		t++
 		if err != nil {
+			if  strings.Contains(err.Error(), "cannot scan NULL into *time.Time"){
+				reminders.Time = time.Time{}
+			}
 			return []time.Time{}, fmt.Errorf("Error for getReminders %w", err), []string{}
 		}
 		allReminders = append(allReminders, reminders.Content)
@@ -130,7 +133,11 @@ func (r *reminder) timeReminder(ctx context.Context, userID int64, remind_at str
 		return 0, time.Time{}, "", nil
 	}
 
-	fmt.Println(serialID)
 	_, err = r.db.Exec(ctx, "update reminders set remind_at=$1 where id=$2", result.Time, serialID)
+
+		if remind_at == "" {
+			return serialID, time.Time{}, userLocation, nil
+	}
+
 	return serialID, result.Time, userLocation, nil
 }
