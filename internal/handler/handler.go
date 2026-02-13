@@ -151,6 +151,12 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 			h.bot.Send(edit)
 			return
 
+	case "write_me": 
+		edit.Text = "По любым вопросам, предложениям пишите @susvlad228"
+		keyboard := k.Back()
+		edit.ReplyMarkup = &keyboard
+		h.bot.Send(edit)
+		return
 
 	case "add_reminder":
 			keyboard := k.Back()
