@@ -55,12 +55,14 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 		ctx := context.Background()
 		r := newReminder(h.conn)
 		k := newKeyboard(h.bot, cb.Message.Chat.ID)
+		t := mytime.New(h.conn)
 
 		edit := tgbotapi.NewEditMessageText(
 			cb.Message.Chat.ID,
 				cb.Message.MessageID,
 				"",
 		)
+		edit.ParseMode = tgbotapi.ModeHTML
 
 		h.bot.Request(tgbotapi.NewCallback(cb.ID, ""))
 
@@ -92,7 +94,6 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 				text, keyboard := k.remindersMenu(allReminders, allTime, index)
 			edit.Text = text
 			edit.ReplyMarkup = &keyboard
-			edit.ParseMode = tgbotapi.ModeHTML
 			h.bot.Send(edit)
 		}
 			if strings.HasPrefix(data, "remind_back") {
@@ -107,7 +108,6 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 			text,keyboard := k.remindersMenu(allReminders, allTime, index-7)
 				edit.Text = text
 			edit.ReplyMarkup = &keyboard
-			edit.ParseMode = tgbotapi.ModeHTML
 			h.bot.Send(edit)
 		}
 
@@ -130,10 +130,26 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 			text, keyboard := k.remindersMenu(allReminders, allTime, 0)
 			edit.Text = text
 			edit.ReplyMarkup = &keyboard
-			edit.ParseMode = tgbotapi.ModeHTML
 			h.bot.Send(edit)
 			return
+			
+	case "find_local_zone":
+		edit.Text = "Введите ваш город. Пример:Лондон, Киев, Москва"
+		h.bot.Send(edit)
+		setUserState(cb.Message.Chat.ID, "waiting_for_city")
+				return
 
+	case "settings":
+			timeZone, err := t.GetUserTimeZone(ctx, cb.Message.Chat.ID)
+			localTime, _ := mytime.GetUserLocalTimeZone(timeZone)
+			if err != nil {
+				log.Println(err)
+			}
+			edit.Text =  fmt.Sprintf("<b>Ваша временная зона это</b> %s.\n<b>Ваше локальное время:</b> %s.\n", timeZone, localTime)
+			keyboard := k.settingsMenu()
+			edit.ReplyMarkup = &keyboard
+			h.bot.Send(edit)
+			return
 
 
 	case "add_reminder":
@@ -217,9 +233,7 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 			case "waiting_for_data_reminder":
 			if(userText == "Сохранить как заметку") {
 					r.timeReminder(ctx, chatID, "")
-					msg.Text = "Сохранено как заметку"
-					h.bot.Send(msg)
-
+					k.emptyMenu("Сохранено как заметку")
 					keyboard, text := k.inlineMenu()
 					msg.Text = text
 					msg.ReplyMarkup = keyboard
@@ -287,19 +301,6 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 			}
 		}
 
-		switch update.Message.Text {
-
-		case "⚙️ Настройки":
-			timeZone, err := t.GetUserTimeZone(ctx, chatID)
-			localTime, _ := mytime.GetUserLocalTimeZone(timeZone)
-			if err != nil {
-				log.Println(err)
-			}
-			msg.Text = fmt.Sprintf("<b>Your time zone is </b>%s.\n<b>Your local time is </b>%s.\nIf that's not true, try to write your city with /time", timeZone, localTime)
-			h.bot.Send(msg)
-			return
-		}
-
 		if update.Message.IsCommand() {
 
 			user, err := u.GetUser(ctx, chatID)
@@ -315,12 +316,7 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 
 			switch update.Message.Command() {
 			case "start":
-				k.emptyMenu()
-				setUserState(chatID, "waiting_for_city")
-				return
-			case "time":
-				msg.Text = "Please enter your city to find out your time zone"
-				h.bot.Send(msg)
+				k.emptyMenu("Привет пользователь! Пожалуйста введи свой город, что бы узнать твой часовой пояс")
 				setUserState(chatID, "waiting_for_city")
 				return
 			}

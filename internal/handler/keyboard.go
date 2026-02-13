@@ -26,8 +26,8 @@ func newKeyboard(bot *tgbotapi.BotAPI, userID int64) *keyboard {
 	}
 }
 
-func (k *keyboard) emptyMenu() {
-	msg := tgbotapi.NewMessage(k.userID, "Hello User, please enter your city to find out your time zone")
+func (k *keyboard) emptyMenu(text string) {
+	msg := tgbotapi.NewMessage(k.userID, text)
 	msg.ReplyMarkup = tgbotapi.NewRemoveKeyboard(true)
 	k.bot.Send(msg)
 }
@@ -79,7 +79,7 @@ func (k *keyboard) remindersMenu(allreminders []string, allTime []time.Time, pag
 		if len(allreminders) > end && page >= 7 {
 		keyboardRows[len(keyboardRows)-1] = append(keyboardRows[len(keyboardRows)-1], tgbotapi.NewInlineKeyboardButtonData("Далее", fmt.Sprintf("remind_next_%d", end)))
 	}
-		keyboardRows = append(keyboardRows, tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("Вернуться", "go_to_menu"),),)
+		keyboardRows = append(keyboardRows, tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("⬅️ Вернуться", "go_to_menu"),),)
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(keyboardRows...)
 
 	if text == ""{
@@ -175,4 +175,15 @@ func (k *keyboard) inlineMenu() (tgbotapi.InlineKeyboardMarkup, string) {
 
 	text := "Основное меню. Здесь вы можете создать, просмотреть все свои записи, настроть их. Настроить все что вам нужно и пообщаться с чат ботом"
 	return keyboard, text
+}
+
+func (k *keyboard) settingsMenu() tgbotapi.InlineKeyboardMarkup{
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("Ввести город заново", "find_local_zone"),
+		),
+		tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("⬅️ Вернуться", "go_to_menu"),
+	),
+)
+return keyboard
 }
