@@ -56,6 +56,12 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 		r := newReminder(h.conn)
 		k := newKeyboard(h.bot, cb.Message.Chat.ID)
 
+		edit := tgbotapi.NewEditMessageText(
+			cb.Message.Chat.ID,
+				cb.Message.MessageID,
+				"",
+		)
+
 		h.bot.Request(tgbotapi.NewCallback(cb.ID, ""))
 
 		if strings.HasPrefix(data, "remindme_") {
@@ -71,10 +77,7 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 				fmt.Println(err)
 				return
 			}
-			edit := tgbotapi.NewEditMessageText(
-				cb.Message.Chat.ID,
-				cb.Message.MessageID,
-				remindNumber)
+			edit.Text = remindNumber
 			edit.ReplyMarkup = &selectedKeyboard
 			h.bot.Send(edit)
 		}
@@ -87,10 +90,7 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 			}
 			allTime, err, allReminders := r.getReminders(ctx, cb.Message.Chat.ID)
 				text, keyboard := k.remindersMenu(allReminders, allTime, index)
-				edit := tgbotapi.NewEditMessageText(
-				cb.Message.Chat.ID,
-				cb.Message.MessageID,
-				text)
+			edit.Text = text
 			edit.ReplyMarkup = &keyboard
 			edit.ParseMode = tgbotapi.ModeHTML
 			h.bot.Send(edit)
@@ -105,10 +105,7 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 }
 			allTime, err, allReminders := r.getReminders(ctx, cb.Message.Chat.ID)
 			text,keyboard := k.remindersMenu(allReminders, allTime, index-7)
-				edit := tgbotapi.NewEditMessageText(
-				cb.Message.Chat.ID,
-				cb.Message.MessageID,
-				text)
+				edit.Text = text
 			edit.ReplyMarkup = &keyboard
 			edit.ParseMode = tgbotapi.ModeHTML
 			h.bot.Send(edit)
@@ -117,13 +114,41 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 
 		switch data {
 
+		case "go_to_menu":
+		keyboard, text := k.inlineMenu()
+		edit.Text = text
+		clearUserState(cb.Message.Chat.ID)
+		edit.ReplyMarkup = &keyboard
+		h.bot.Send(edit)
+		return
+
+	case "get_reminders":
+					allTime, err, allReminders := r.getReminders(ctx, cb.Message.Chat.ID)
+			if err != nil {
+				log.Println(err)
+			}
+			text, keyboard := k.remindersMenu(allReminders, allTime, 0)
+			edit.Text = text
+			edit.ReplyMarkup = &keyboard
+			edit.ParseMode = tgbotapi.ModeHTML
+			h.bot.Send(edit)
+			return
+
+
+
+	case "add_reminder":
+			keyboard := k.Back()
+			edit.ReplyMarkup = &keyboard
+			edit.Text = "⏰ О чем тебе напомнить? Напиши текст напоминания."
+			h.bot.Send(edit)
+			setUserState(cb.Message.Chat.ID, "waiting_for_reminder")
+			return
+
+
+
 		case "delete_reminder":
 			keyboard := k.sureDelete()
-			edit := tgbotapi.NewEditMessageText(
-	cb.Message.Chat.ID,
-				cb.Message.MessageID,
-				"Вы точно хотите удалить заметку?",
-			)
+			edit.Text =	"Вы точно хотите удалить заметку?"
 			edit.ReplyMarkup = &keyboard
 			h.bot.Send(edit)
 			return
@@ -156,8 +181,7 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 			switch currentState {
 			case "waiting_for_reminder":
 				if userText == "⬅️ Вернуться"{
-					clearUserState(chatID)
-					k.lobbyMenu()
+					k.inlineMenu()
 					return
 				}
 				k.saveNote("Send time when you want to be reminded. <b>Now understands only russain</b>. Example\nсегодня в 16:00, завтра в 9\n" +
@@ -195,8 +219,11 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 					r.timeReminder(ctx, chatID, "")
 					msg.Text = "Сохранено как заметку"
 					h.bot.Send(msg)
-					clearUserState(chatID)
-					k.lobbyMenu()
+
+					keyboard, text := k.inlineMenu()
+					msg.Text = text
+					msg.ReplyMarkup = keyboard
+					h.bot.Send(msg)
 					return
 			}
 				serialID, now, userLocation, err := r.timeReminder(ctx, chatID, userText)
@@ -223,10 +250,13 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 					fmt.Println(err)
 					return
 				}
-				msg.Text = "The remind is saved"
+				msg.Text = "Напоминание сохранено"
 				h.bot.Send(msg)
-				k.lobbyMenu()
-				clearUserState(chatID)
+				
+				keyboard, text := k.inlineMenu()
+				msg.ReplyMarkup = keyboard
+				msg.Text = text
+				h.bot.Send(msg)
 				return
 			case "waiting_for_city":
 				coord, err := mytime.GetCoordinates(userText)
@@ -249,32 +279,15 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 				if err != nil {
 					log.Println(fmt.Errorf("Error :%w", err))
 				}
-				msg.Text = fmt.Sprintf("<b>Your time zone is</b> %s.\n<b>Your local time is</b> %s.\nIf that's not true, try to write your city with /time", timez, localTime)
+				msg.Text = fmt.Sprintf("<b>Ваша временная зона это</b> %s.\n<b>Ваше локальное время:</b> %s.\n", timez, localTime)
+				keyboard := k.sureLocalZone()
+				msg.ReplyMarkup = keyboard
 				h.bot.Send(msg)
-				k.lobbyMenu()
 				return
 			}
 		}
 
 		switch update.Message.Text {
-
-
-		case "➕ Добавить напоминание":
-			k.Back("⏰ О чем тебе напомнить? Напиши текст напоминания.")
-			h.bot.Send(msg)
-			setUserState(chatID, "waiting_for_reminder")
-			return
-
-		case "📋 Мои напоминания":
-			allTime, err, allReminders := r.getReminders(ctx, chatID)
-			if err != nil {
-				log.Println(err)
-			}
-			text, keyboard := k.remindersMenu(allReminders, allTime, 0)
-			msg.Text = text
-			msg.ReplyMarkup = keyboard
-			h.bot.Send(msg)
-			return
 
 		case "⚙️ Настройки":
 			timeZone, err := t.GetUserTimeZone(ctx, chatID)

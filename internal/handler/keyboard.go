@@ -79,7 +79,7 @@ func (k *keyboard) remindersMenu(allreminders []string, allTime []time.Time, pag
 		if len(allreminders) > end && page >= 7 {
 		keyboardRows[len(keyboardRows)-1] = append(keyboardRows[len(keyboardRows)-1], tgbotapi.NewInlineKeyboardButtonData("Далее", fmt.Sprintf("remind_next_%d", end)))
 	}
-
+		keyboardRows = append(keyboardRows, tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("Вернуться", "go_to_menu"),),)
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(keyboardRows...)
 
 	if text == ""{
@@ -111,16 +111,14 @@ func (k *keyboard) selectedMenu(ctx context.Context, db *pgxpool.Pool, remindNum
 	return nil, keyboard, result
 }
 
-func (k *keyboard) Back(text string) {
-	keyboard := tgbotapi.NewReplyKeyboard(
-		tgbotapi.NewKeyboardButtonRow(
-			tgbotapi.NewKeyboardButton("⬅️ Вернуться"),
+func (k *keyboard) Back() tgbotapi.InlineKeyboardMarkup {
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("⬅️ Вернуться", "go_to_menu"),
 		),
 	)
 
-	msg := tgbotapi.NewMessage(k.userID, text)
-	msg.ReplyMarkup = keyboard
-	k.bot.Send(msg)
+	return keyboard
 }
 
 
@@ -144,4 +142,37 @@ func (k *keyboard) saveNote(text string) {
 		msg.ParseMode = tgbotapi.ModeHTML
 		msg.ReplyMarkup = keyboard
 		k.bot.Send(msg)
+}
+
+func (k *keyboard) sureLocalZone() tgbotapi.InlineKeyboardMarkup{
+ 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+      tgbotapi.NewInlineKeyboardButtonData("Да, правильно", "go_to_menu"),
+			tgbotapi.NewInlineKeyboardButtonData("Нет, не правильно", "find_local_zone"),
+		),
+	)
+return keyboard
+}
+
+
+func (k *keyboard) inlineMenu() (tgbotapi.InlineKeyboardMarkup, string) {
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+      tgbotapi.NewInlineKeyboardButtonData("Добавить напоминание", "add_reminder"),
+			tgbotapi.NewInlineKeyboardButtonData("Посмотреть заметки", "get_reminders"),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("Добавить план", "add_plan"),
+			tgbotapi.NewInlineKeyboardButtonData("Посмотреть план", "get_plans"),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("Настройки", "settings"),
+		),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("Написать создателю", "write_me"),
+	),
+	)
+
+	text := "Основное меню. Здесь вы можете создать, просмотреть все свои записи, настроть их. Настроить все что вам нужно и пообщаться с чат ботом"
+	return keyboard, text
 }
