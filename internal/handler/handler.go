@@ -16,6 +16,8 @@ import (
 
 var (
 	globalIndex int
+	remindAgainText string
+	dataForStatus string
 )
 
 type handler struct {
@@ -50,7 +52,7 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 
 	if update.CallbackQuery != nil {
 		cb := update.CallbackQuery
-		//msg := tgbotapi.NewMessage(cb.Message.Chat.ID, "")
+		msg := tgbotapi.NewMessage(cb.Message.Chat.ID, "")
 		data := cb.Data
 		ctx := context.Background()
 		r := newReminder(h.conn)
@@ -127,6 +129,7 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 			if err != nil {
 				log.Println(err)
 			}
+
 			text, keyboard := k.remindersMenu(allReminders, allTime, 0)
 			edit.Text = text
 			edit.ReplyMarkup = &keyboard
@@ -165,6 +168,12 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 			h.bot.Send(edit)
 			setUserState(cb.Message.Chat.ID, "waiting_for_reminder")
 			return
+
+		case "own_time": 
+		msg.Text= "Напишите когда вам еще раз напомнить"
+		h.bot.Send(msg)
+		dataForStatus = "own_time"
+		setUserState(cb.Message.Chat.ID, "waiting_for_reminder")
 
 
 
@@ -208,10 +217,17 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 				}
 				k.saveNote("Send time when you want to be reminded. <b>Now understands only russain</b>. Example\nсегодня в 16:00, завтра в 9\n" +
 					"через 10 минут, через 2 часа\n5 февраля в 14:00, 12.03.2026 в 10")
-				err := r.saveReminder(ctx, chatID, userText)
-				if err != nil {
+					if dataForStatus == "own_time" {
+						err := r.saveReminder(ctx, chatID, remindAgainText)
+						if err != nil {
+							fmt.Println(err)
+									}
+
+					} else {err := r.saveReminder(ctx, chatID, userText) 
+					if err != nil {
 					fmt.Println(err)
 				}
+			}
 				setUserState(chatID, "waiting_for_data_reminder")
 				return
 
@@ -239,11 +255,12 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 			case "waiting_for_data_reminder":
 			if(userText == "Сохранить как заметку") {
 					r.timeReminder(ctx, chatID, "")
-					k.emptyMenu("Сохранено как заметку")
+					k.openMainMenu("Сохранено как заметку")
 					keyboard, text := k.inlineMenu()
 					msg.Text = text
 					msg.ReplyMarkup = keyboard
 					h.bot.Send(msg)
+					clearUserState(chatID)
 					return
 			}
 				serialID, now, userLocation, err := r.timeReminder(ctx, chatID, userText)
@@ -265,13 +282,11 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 						"Примеры:\n" +
 						"сегодня в 16:00, завтра в 9\nчерез 10 минут, через 2 часа\n5 февраля в 14:00, 12.03.2026 в 10"
 					h.bot.Send(msg)
-					fmt.Println(chatID)
 					setUserState(chatID, "waiting_for_data_reminder")
 					fmt.Println(err)
 					return
 				}
-				msg.Text = "Напоминание сохранено"
-				h.bot.Send(msg)
+				k.openMainMenu("Напоминание сохранено")
 				
 				keyboard, text := k.inlineMenu()
 				msg.ReplyMarkup = keyboard
@@ -307,6 +322,14 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 			}
 		}
 
+		if update.Message.Text == "Открыть главное меню" {
+							keyboard, text := k.inlineMenu()
+				msg.ReplyMarkup = keyboard
+				msg.Text = text
+				h.bot.Send(msg)
+			return
+		}
+
 		if update.Message.IsCommand() {
 
 			user, err := u.GetUser(ctx, chatID)
@@ -331,6 +354,8 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 }
 
 func (h *handler) sendReminder(ctx context.Context, serialID int64, sendTime time.Time, timezone string, msg tgbotapi.MessageConfig) error {
+
+	k := newKeyboard(h.bot, msg.ChatID)
 	// Создаем планировщик
 	s, err := gocron.NewScheduler()
 	if err != nil {
@@ -354,7 +379,7 @@ func (h *handler) sendReminder(ctx context.Context, serialID int64, sendTime tim
 	}
 	var check string
 	var result int
-		checkTime := time.Date(sendTime.Year(), sendTime.Month(), sendTime.Day(), sendTime.Hour(), sendTime.Minute(), 0, 0, loc)
+		checkTime := time.Date(sendTime.Year(), sendTime.Month(), sendTime.Day(), sendTime.Hour(), sendTime.Minute(), sendTime.Second(), 0, loc)
 
 			_, err = s.NewJob(
 		gocron.OneTimeJob(
@@ -368,7 +393,8 @@ func (h *handler) sendReminder(ctx context.Context, serialID int64, sendTime tim
         fmt.Println("Compare result:", result)
 
 		if result == 0{
-			h.bot.Send(msg)
+			k.remindAgain(msg.Text)
+			remindAgainText = msg.Text
 		}
     }),
 	)

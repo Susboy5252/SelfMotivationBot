@@ -135,8 +135,6 @@ func (r *reminder) timeReminder(ctx context.Context, userID int64, remind_at str
 		return 0, time.Time{}, "", nil
 	}
 
-	fmt.Println(serialID)
-	fmt.Println(result.Time)
 	_, err = r.db.Exec(ctx, "update reminders set remind_at=$1 where id=$2", result.Time, serialID)
 	if err != nil {
 		return 0, time.Time{}, "", fmt.Errorf("Error r.db.Exec timeReminder %w", err)

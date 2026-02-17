@@ -58,11 +58,13 @@ func (k *keyboard) remindersMenu(allreminders []string, allTime []time.Time, pag
 	text := ""
 
 	for i := range showReminders {
+		
+ 		realIndex := start + i
 
-		if allTime[i].IsZero() {
+		if allTime[realIndex].IsZero() {
 					text += strconv.Itoa(i+page+1) + " " + showReminders[i] + " Заметка"+ "\n"
 		}	else {
-		text += strconv.Itoa(i+page+1) + " " + showReminders[i] + " " + allTime[i].Format("02.01.2006 15:04") + "\n"
+		text += strconv.Itoa(i+page+1) + " " + showReminders[i] + " " + allTime[realIndex].Format("02.01.2006 15:04") + "\n"
 	}
 		row[i] = tgbotapi.NewInlineKeyboardButtonData(strconv.Itoa(page+i+1), fmt.Sprintf("remindme_%d", page+i))
 	}
@@ -186,4 +188,36 @@ func (k *keyboard) settingsMenu() tgbotapi.InlineKeyboardMarkup{
 	),
 )
 return keyboard
+}
+
+func (k *keyboard) openMainMenu(text string) {
+	keyboard := tgbotapi.NewReplyKeyboard(
+		tgbotapi.NewKeyboardButtonRow(
+			tgbotapi.NewKeyboardButton("Открыть главное меню"),
+		),
+	)
+	msg := tgbotapi.NewMessage(k.userID, text)
+	msg.ReplyMarkup = keyboard
+	k.bot.Send(msg)
+}
+
+func (k *keyboard) remindAgain(text string) {
+
+	alltext := text + "\n Напомнить еще раз через:"
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(
+				"полчаса", "in_halfhour"),
+					tgbotapi.NewInlineKeyboardButtonData(
+				"час", "in_hour"),
+					tgbotapi.NewInlineKeyboardButtonData(
+				"3 часа", "in_3hours"),
+					tgbotapi.NewInlineKeyboardButtonData(
+				"завтра", "tomorrow"),
+		),
+		tgbotapi.NewInlineKeyboardRow("Свое время", "own_time")
+	)
+	msg := tgbotapi.NewMessage(k.userID, alltext)
+	msg.ReplyMarkup = keyboard
+	k.bot.Send(msg)
 }
