@@ -215,7 +215,9 @@ func (k *keyboard) remindAgain(text string) {
 					tgbotapi.NewInlineKeyboardButtonData(
 				"завтра", "tomorrow"),
 		),
-		tgbotapi.NewInlineKeyboardRow("Свое время", "own_time")
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("Свое время", "own_time"),
+		),
 	)
 	msg := tgbotapi.NewMessage(k.userID, alltext)
 	msg.ReplyMarkup = keyboard
