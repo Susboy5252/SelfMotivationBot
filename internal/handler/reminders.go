@@ -119,7 +119,7 @@ func (r *reminder) timeReminder(ctx context.Context, userID int64, remind_at str
 	loc, err := time.LoadLocation(userLocation)
 	if err != nil {
 		return 0, time.Time{}, "", fmt.Errorf("Error time.LoadLocation writeReminder %w", err)
-	}
+	}		
 
 	now := time.Now().In(loc)
 
