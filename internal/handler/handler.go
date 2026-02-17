@@ -170,12 +170,53 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 			return
 
 		case "own_time": 
-		msg.Text= "Напишите когда вам еще раз напомнить"
+		msg.Text= "<b>Напишите когда отправить вам напоминание</b>. Пример\nсегодня в 16:00, завтра в 9\n" +
+					"через 10 минут, через 2 часа\n5 февраля в 14:00, 12.03.2026 в 10"
 		h.bot.Send(msg)
 		dataForStatus = "own_time"
-		setUserState(cb.Message.Chat.ID, "waiting_for_reminder")
-
-
+		setUserState(cb.Message.Chat.ID, "waiting_for_data_reminder")
+		return
+		
+		case "in_halfhour":
+			r.saveReminder(ctx, cb.Message.Chat.ID, remindAgainText)
+							keyboard := k.Back()
+		edit.ReplyMarkup = &keyboard
+		h.bot.Send(edit)
+					edit.Text= "Напоминание повторится через пол часа"
+		h.bot.Send(edit)
+			serialID, now, userLocation, _ := r.timeReminder(ctx, cb.Message.Chat.ID, "через 30 минут")
+				_ = h.sendReminder(ctx, serialID, now, userLocation, msg)
+				return
+						case "in_hour":
+			r.saveReminder(ctx, cb.Message.Chat.ID, remindAgainText)
+							keyboard := k.Back()
+		edit.ReplyMarkup = &keyboard
+		h.bot.Send(edit)
+					edit.Text= "Напоминание повторится через час"
+		h.bot.Send(edit)
+			serialID, now, userLocation, _ := r.timeReminder(ctx, cb.Message.Chat.ID, "через час")
+				_ = h.sendReminder(ctx, serialID, now, userLocation, msg)
+				return
+						case "in_3hours":
+			r.saveReminder(ctx, cb.Message.Chat.ID, remindAgainText)
+							keyboard := k.Back()
+		edit.ReplyMarkup = &keyboard
+		h.bot.Send(edit)
+					edit.Text= "Напоминание повторится через 3 часа"
+		h.bot.Send(edit)
+			serialID, now, userLocation, _ := r.timeReminder(ctx, cb.Message.Chat.ID, "через 3 часа")
+				_ = h.sendReminder(ctx, serialID, now, userLocation, msg)
+				return
+						case "tomorrow":
+								keyboard := k.Back()
+		edit.ReplyMarkup = &keyboard
+		h.bot.Send(edit)
+			r.saveReminder(ctx, cb.Message.Chat.ID, remindAgainText)
+					edit.Text= "Напоминание повторится завтра"
+		h.bot.Send(edit)
+			serialID, now, userLocation, _ := r.timeReminder(ctx, cb.Message.Chat.ID, "завтра")
+				_ = h.sendReminder(ctx, serialID, now, userLocation, msg)
+				return
 
 		case "delete_reminder":
 			keyboard := k.sureDelete()
@@ -215,18 +256,12 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 					k.inlineMenu()
 					return
 				}
-				k.saveNote("Send time when you want to be reminded. <b>Now understands only russain</b>. Example\nсегодня в 16:00, завтра в 9\n" +
+				k.saveNote("<b>Напишите когда отправить вам напоминание</b>. Пример\nсегодня в 16:00, завтра в 9\n" +
 					"через 10 минут, через 2 часа\n5 февраля в 14:00, 12.03.2026 в 10")
-					if dataForStatus == "own_time" {
-						err := r.saveReminder(ctx, chatID, remindAgainText)
-						if err != nil {
-							fmt.Println(err)
-									}
-
-					} else {err := r.saveReminder(ctx, chatID, userText) 
+					
+					err := r.saveReminder(ctx, chatID, userText) 
 					if err != nil {
 					fmt.Println(err)
-				}
 			}
 				setUserState(chatID, "waiting_for_data_reminder")
 				return
@@ -253,6 +288,16 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 				h.bot.Send(msg)
 				return
 			case "waiting_for_data_reminder":
+									if dataForStatus == "own_time" {
+						err := r.saveReminder(ctx, chatID, remindAgainText)
+						if err != nil {
+							fmt.Println(err)
+									}
+								clearUserState(chatID)	
+							  dataForStatus = ""
+								return
+								}
+
 			if(userText == "Сохранить как заметку") {
 					r.timeReminder(ctx, chatID, "")
 					k.openMainMenu("Сохранено как заметку")
