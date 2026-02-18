@@ -48,7 +48,7 @@ func (k *keyboard) lobbyMenu() {
 	k.bot.Send(msg)
 }
 
-func (k *keyboard) remindersMenu(allreminders []string, allTime []time.Time, page int) (string, tgbotapi.InlineKeyboardMarkup) {
+func (k *keyboard) remindersMenu(allreminders []string, allTime []time.Time, page int,done []bool) (string, tgbotapi.InlineKeyboardMarkup) {
 	maxButtons := 7
 	start := page
 	end := min(page+maxButtons, len(allreminders))
@@ -64,8 +64,13 @@ func (k *keyboard) remindersMenu(allreminders []string, allTime []time.Time, pag
 		if allTime[realIndex].IsZero() {
 					text += strconv.Itoa(i+page+1) + " " + showReminders[i] + " Заметка"+ "\n"
 		}	else {
-		text += strconv.Itoa(i+page+1) + " " + showReminders[i] + " " + allTime[realIndex].Format("02.01.2006 15:04") + "\n"
-	}
+			if done[i] == false {
+				text += strconv.Itoa(i+page+1) + " " + showReminders[i] + " " + allTime[realIndex].Format("02.01.2006 15:04") + " ❌" + "\n"
+			} else {
+					text += strconv.Itoa(i+page+1) + " " + showReminders[i] + " " + allTime[realIndex].Format("02.01.2006 15:04") + " ✅" + "\n"
+			}
+
+				}
 		row[i] = tgbotapi.NewInlineKeyboardButtonData(strconv.Itoa(page+i+1), fmt.Sprintf("remindme_%d", page+i))
 	}
 	keyboardRows := [][]tgbotapi.InlineKeyboardButton{row}
@@ -95,21 +100,30 @@ func (k *keyboard) remindersMenu(allreminders []string, allTime []time.Time, pag
 
 func (k *keyboard) selectedMenu(ctx context.Context, db *pgxpool.Pool, remindNumber int) (error, tgbotapi.InlineKeyboardMarkup, string) {
 	result := ""
+	doneResult := false
 	k.mu.Lock()
 	serialID := models.Map_id[remindNumber+1]
 	defer k.mu.Unlock()
-	row := db.QueryRow(ctx, "select content from reminders where id=$1", serialID)
-	err := row.Scan(&result)
+	row := db.QueryRow(ctx, "select content, done from reminders where id=$1", serialID)
+	err := row.Scan(&result, &doneResult)
 	if err != nil {
 		return fmt.Errorf("Erorr row.scan selectedMenu %w", err),
 			tgbotapi.InlineKeyboardMarkup{}, ""
 	}
+		statusText := "Не выполнено"
+	if doneResult {
+		statusText = "Выполнено"
+	}
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData("Удалить", "delete_reminder"),
-			tgbotapi.NewInlineKeyboardButtonData("Назад ->", "back_to_reminders"),
+			tgbotapi.NewInlineKeyboardButtonData(statusText, "done"),
+		),
+		tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("Назад ->", "back_to_reminders"),
 		),
 	)
+
+	result += "\nВыполнено: " + statusText
 	return nil, keyboard, result
 }
 

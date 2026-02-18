@@ -60,27 +60,29 @@ func (r *reminder) countReminders(ctx context.Context, userID int64) (error, int
 	}
 	return nil, i
 }
-func (r *reminder) getReminders(ctx context.Context, userID int64) ([]time.Time, error, []string) {
+func (r *reminder) getReminders(ctx context.Context, userID int64) ([]time.Time, error, []string, []bool) {
 	var allReminders []string
 	var allTime []time.Time
+	var allDone []bool
 	var reminders models.Reminders
-	query := "Select content, remind_at from reminders where user_id=$1"
+	query := "Select content, remind_at, done from reminders where user_id=$1"
 	rows, err := r.db.Query(ctx, query, userID)
 	if err != nil {
-		return []time.Time{}, fmt.Errorf("Error h.pool.Query countReminders %w", err), []string{}
+		return []time.Time{}, fmt.Errorf("Error h.pool.Query countReminders %w", err), []string{}, []bool{}
 	}
 	defer rows.Close()
 	err, _ = r.countReminders(ctx, userID)
 	if err != nil {
-		return []time.Time{}, fmt.Errorf("Error countReminders %w", err), []string{}
+		return []time.Time{}, fmt.Errorf("Error countReminders %w", err), []string{},[]bool{}
 	}
 	t := 0
 	for rows.Next() {
-		err := rows.Scan(&reminders.Content, &reminders.Time)
+		err := rows.Scan(&reminders.Content, &reminders.Time, &reminders.Done)
 		t++
 		if err != nil {
-			return []time.Time{}, fmt.Errorf("Error for getReminders %w", err), []string{}
+			return []time.Time{}, fmt.Errorf("Error for getReminders %w", err), []string{}, []bool{}
 		}
+		allDone = append(allDone, reminders.Done)
 		allReminders = append(allReminders, reminders.Content)
 		if reminders.Time != nil {
 	allTime = append(allTime, *reminders.Time)
@@ -88,7 +90,7 @@ func (r *reminder) getReminders(ctx context.Context, userID int64) ([]time.Time,
 	allTime = append(allTime, time.Time{}) 
 }
 	}
-	return allTime, nil, allReminders
+	return allTime, nil, allReminders, allDone
 }
 
 func (r *reminder) saveReminder(ctx context.Context, userID int64, reminder string) error {
@@ -140,4 +142,16 @@ func (r *reminder) timeReminder(ctx context.Context, userID int64, remind_at str
 		return 0, time.Time{}, "", fmt.Errorf("Error r.db.Exec timeReminder %w", err)
 	}
 	return serialID, result.Time, userLocation, nil
+}
+
+func (r *reminder) changeDone (ctx context.Context, localID int) error {
+	serialID := models.Map_id[localID]
+	done := false
+	row := r.db.QueryRow(ctx, "select done from reminders where id=$1",serialID)
+		row.Scan(&done)
+	_, err := r.db.Exec(ctx, "update reminders set done=$1 where id=$2", !done, serialID)
+	if err != nil {
+		return fmt.Errorf("Error changeDone %w", err)
+	}
+	return nil
 }

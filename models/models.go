@@ -22,4 +22,5 @@ type Reminders struct {
 	Local_id  int
 	Content   string
 	Time *time.Time
+	Done bool
 }

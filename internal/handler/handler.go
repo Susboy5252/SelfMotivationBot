@@ -77,6 +77,7 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 			}
 			globalIndex = index + 1
 			err, selectedKeyboard, remindNumber := k.selectedMenu(ctx, h.conn, index)
+
 			if err != nil {
 				fmt.Println(err)
 				return
@@ -92,8 +93,8 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 				fmt.Println(err)
 				return
 			}
-			allTime, err, allReminders := r.getReminders(ctx, cb.Message.Chat.ID)
-				text, keyboard := k.remindersMenu(allReminders, allTime, index)
+			allTime, err, allReminders, allDone := r.getReminders(ctx, cb.Message.Chat.ID)
+				text, keyboard := k.remindersMenu(allReminders, allTime, index, allDone)
 			edit.Text = text
 			edit.ReplyMarkup = &keyboard
 			h.bot.Send(edit)
@@ -106,8 +107,8 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 				fmt.Println(err)
 				return
 }
-			allTime, err, allReminders := r.getReminders(ctx, cb.Message.Chat.ID)
-			text,keyboard := k.remindersMenu(allReminders, allTime, index-7)
+			allTime, err, allReminders, allDone := r.getReminders(ctx, cb.Message.Chat.ID)
+			text,keyboard := k.remindersMenu(allReminders, allTime, index-7, allDone)
 				edit.Text = text
 			edit.ReplyMarkup = &keyboard
 			h.bot.Send(edit)
@@ -125,12 +126,12 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 		return
 
 	case "get_reminders":
-					allTime, err, allReminders := r.getReminders(ctx, cb.Message.Chat.ID)
+					allTime, err, allReminders, allDone := r.getReminders(ctx, cb.Message.Chat.ID)
 			if err != nil {
 				log.Println(err)
 			}
 
-			text, keyboard := k.remindersMenu(allReminders, allTime, 0)
+			text, keyboard := k.remindersMenu(allReminders, allTime, 0, allDone)
 			edit.Text = text
 			edit.ReplyMarkup = &keyboard
 			h.bot.Send(edit)
@@ -216,6 +217,14 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 		h.bot.Send(edit)
 			serialID, now, userLocation, _ := r.timeReminder(ctx, cb.Message.Chat.ID, "завтра")
 				_ = h.sendReminder(ctx, serialID, now, userLocation, msg)
+				return
+
+		case "done":
+			err := r.changeDone(ctx, globalIndex)
+				fmt.Println(globalIndex)
+				if err != nil {
+					fmt.Println(err)
+				}
 				return
 
 		case "delete_reminder":
@@ -333,6 +342,7 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 				}
 				k.openMainMenu("Напоминание сохранено")
 				
+				clearUserState(chatID)
 				keyboard, text := k.inlineMenu()
 				msg.ReplyMarkup = keyboard
 				msg.Text = text
@@ -350,7 +360,7 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 				err, timez := t.GetTimeZone(ctx, chatID, coord.Lng, coord.Lat)
 				if err != nil {
 					log.Println(fmt.Errorf("Error :%w", err))
-					msg.Text = "Error can't find your city, try to write your city again"
+					msg.Text = "Не смогли найти ваш город, попробуйте ввести еще раз.\n Пример:Лондон, Киев, Москва "
 					h.bot.Send(msg)
 					return
 				}
@@ -401,7 +411,6 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 func (h *handler) sendReminder(ctx context.Context, serialID int64, sendTime time.Time, timezone string, msg tgbotapi.MessageConfig) error {
 
 	k := newKeyboard(h.bot, msg.ChatID)
-	// Создаем планировщик
 	s, err := gocron.NewScheduler()
 	if err != nil {
 		return fmt.Errorf("Error gocron.NewSchedular sendReminder %w", err)
@@ -411,7 +420,6 @@ func (h *handler) sendReminder(ctx context.Context, serialID int64, sendTime tim
 	if err != nil {
 		return fmt.Errorf("Error time.LoadLocation sendReminder %w", err)
 
-		// Запланировать на конкретную дату и время
 	}
 	var m string
 	row := h.conn.QueryRow(ctx, "select content from reminders where id=$1", serialID)
@@ -450,17 +458,16 @@ func (h *handler) sendReminder(ctx context.Context, serialID int64, sendTime tim
 		return fmt.Errorf("Error s.NewJob sendReminder %w", err)
 	}
 
-	// Запускаем планировщик
 	s.Start()
 	return nil
 }
 
 func (h *handler) backToReminders (ctx context.Context, cb *tgbotapi.CallbackQuery, r *reminder, k *keyboard) {
-			allTime, err, allReminders := r.getReminders(ctx, cb.Message.Chat.ID)
+			allTime, err, allReminders, allDone := r.getReminders(ctx, cb.Message.Chat.ID)
 			if err != nil {
 				log.Println(err)
 			}
-			text, keyboard := k.remindersMenu(allReminders,allTime, 0)
+			text, keyboard := k.remindersMenu(allReminders,allTime, 0, allDone)
 			edit := tgbotapi.NewEditMessageText(
 				cb.Message.Chat.ID,
 				cb.Message.MessageID,
