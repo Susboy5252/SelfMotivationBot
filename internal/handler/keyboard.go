@@ -58,13 +58,15 @@ func (k *keyboard) remindersMenu(allreminders []string, allTime []time.Time, pag
 	text := ""
 
 	for i := range showReminders {
-		
+		fmt.Println(allreminders[i])
+		fmt.Println(allTime[i])
+		fmt.Println(done[i])
  		realIndex := start + i
 
 		if allTime[realIndex].IsZero() {
 					text += strconv.Itoa(i+page+1) + " " + showReminders[i] + " Заметка"+ "\n"
 		}	else {
-			if done[i] == false {
+			if done[realIndex] == false {
 				text += strconv.Itoa(i+page+1) + " " + showReminders[i] + " " + allTime[realIndex].Format("02.01.2006 15:04") + " ❌" + "\n"
 			} else {
 					text += strconv.Itoa(i+page+1) + " " + showReminders[i] + " " + allTime[realIndex].Format("02.01.2006 15:04") + " ✅" + "\n"
@@ -101,11 +103,12 @@ func (k *keyboard) remindersMenu(allreminders []string, allTime []time.Time, pag
 func (k *keyboard) selectedMenu(ctx context.Context, db *pgxpool.Pool, remindNumber int) (error, tgbotapi.InlineKeyboardMarkup, string) {
 	result := ""
 	doneResult := false
+	checkRemindAt := time.Time{}
 	k.mu.Lock()
 	serialID := models.Map_id[remindNumber+1]
 	defer k.mu.Unlock()
-	row := db.QueryRow(ctx, "select content, done from reminders where id=$1", serialID)
-	err := row.Scan(&result, &doneResult)
+	row := db.QueryRow(ctx, "select content, coalesce(remind_at, '0001-01-01 00:00:00'), done from reminders where id=$1", serialID)
+	err := row.Scan(&result,&checkRemindAt, &doneResult)
 	if err != nil {
 		return fmt.Errorf("Erorr row.scan selectedMenu %w", err),
 			tgbotapi.InlineKeyboardMarkup{}, ""
@@ -114,7 +117,17 @@ func (k *keyboard) selectedMenu(ctx context.Context, db *pgxpool.Pool, remindNum
 	if doneResult {
 		statusText = "Выполнено"
 	}
-	keyboard := tgbotapi.NewInlineKeyboardMarkup(
+			keyboard := tgbotapi.NewInlineKeyboardMarkup()
+	if checkRemindAt.IsZero() {
+		keyboard = tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("Удалить", "delete_reminder"),
+		),
+		tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("Назад ->", "back_to_reminders"),
+	),
+)
+	} else {
+	keyboard = tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData("Удалить", "delete_reminder"),
 			tgbotapi.NewInlineKeyboardButtonData(statusText, "done"),
@@ -122,7 +135,7 @@ func (k *keyboard) selectedMenu(ctx context.Context, db *pgxpool.Pool, remindNum
 		tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("Назад ->", "back_to_reminders"),
 		),
 	)
-
+}
 	result += "\nВыполнено: " + statusText
 	return nil, keyboard, result
 }
