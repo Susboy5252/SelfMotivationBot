@@ -157,10 +157,16 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 			return
 
 		case "acept_remind":
-			//err := r.saveReminder(ctx, cb.From.ID, cleanText)
-			//	if err != nil {
-			//	fmt.Println(err)
-			//	}
+				_, _, _,err, _ := r.saveReminder(ctx, cb.From.ID, alertMessage)
+				if err != nil {
+				fmt.Println(err)
+				}
+				k.openMainMenu("Напоминание друга, успешно сохранено!")
+			keyboard, text := k.inlineMenu()
+			edit.Text = text
+			clearUserState(cb.Message.Chat.ID)
+			edit.ReplyMarkup = &keyboard
+			h.bot.Send(edit)
 
 		case "write_me":
 			edit.Text = "По любым вопросам, предложениям пишите @susvlad228"
@@ -339,13 +345,11 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 					setUserState(chatID, "waiting_for_data_reminder")
 					return
 				}
-				msg.Text = "Напомнинание успешно сохранено!"
+				k.openMainMenu("Напомнинание успешно сохранено!")
 				msgToFriend := tgbotapi.NewMessage(globalMentionUserID, alertMessage)
 				keyboard := k.friendReminderKeybard()
 				msgToFriend.ReplyMarkup = &keyboard
 				h.bot.Send(msgToFriend)
-				msgToFriend.ReplyMarkup = &keyboard
-				h.bot.Send(msg)
 				keyboard, text := k.inlineMenu()
 				msg.Text = text
 				msg.ReplyMarkup = keyboard
@@ -420,7 +424,8 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 					return
 				}
 				k.openMainMenu("Напоминание сохранено")
-				msgToFriend := tgbotapi.NewMessage(globalMentionUserID, alertMessage+" "+userText)
+				alertMessage += " " + userText
+				msgToFriend := tgbotapi.NewMessage(globalMentionUserID, alertMessage)
 				keyboard := k.friendReminderKeybard()
 				msgToFriend.ReplyMarkup = &keyboard
 				h.bot.Send(msgToFriend)

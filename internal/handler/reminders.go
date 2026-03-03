@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 	"strings"
-
+	"regexp"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/olebedev/when"
 	"github.com/olebedev/when/rules/ru"
@@ -83,7 +83,18 @@ func (r *reminder) getReminders(ctx context.Context, userID int64) ([]time.Time,
 		if err != nil {
 			return []time.Time{}, fmt.Errorf("Error for getReminders %w", err), []string{}, []bool{}
 		}
+		re := regexp.MustCompile(`@\w+`)
+		re1 := regexp.MustCompile(`хочет вам напомнить`)
+		mention := re.FindAllString(reminders.Content, -1)
+		withoutMentionText := re.ReplaceAllString(reminders.Content, "")
+		re1.FindAllString(withoutMentionText, -1)
+		if len(mention) != 0 {
+		cleanText := re1.ReplaceAllString(withoutMentionText, "") +" от " + mention[0]
+		cleanText = strings.TrimSpace(cleanText)
+			allReminders = append(allReminders, cleanText)
+	} else {
 		allReminders = append(allReminders, reminders.Content)
+	}
 		if reminders.Time != nil{	
 		allTime = append(allTime, *reminders.Time)
 		} else {
@@ -211,8 +222,4 @@ func (r *reminder) getFriendsReminder (ctx context.Context, mentionedUser string
 		return 0, fmt.Errorf("Errror getFriendsReminder row.Scan %w", err)
 	}
 	return mentionedUserID, nil
-}
-
-func (r *reminder) remindFriends (ctx context.Context, mentions []string) { 
-		//
 }
