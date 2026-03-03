@@ -157,7 +157,7 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 			return
 
 		case "acept_remind":
-				_, _, _,err, _ := r.saveReminder(ctx, cb.From.ID, alertMessage)
+				_, _, _,err, _, _ := r.saveReminder(ctx, cb.From.ID, alertMessage)
 				if err != nil {
 				fmt.Println(err)
 				}
@@ -193,6 +193,7 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 		case "own_time":
 			msg.Text = "<b>Напишите когда отправить вам напоминание</b>. Пример\nсегодня в 16:00, завтра в 9\n" +
 				"через 10 минут, через 2 часа\n5 февраля в 14:00, 12.03.2026 в 10"
+				msg.ParseMode = tgbotapi.ModeHTML
 			h.bot.Send(msg)
 			dataForStatus = "own_time"
 			setUserState(cb.Message.Chat.ID, "waiting_for_data_reminder")
@@ -292,6 +293,7 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 
 		if currentState != "" {
 			switch currentState {
+
 			case "waiting_for_reminder":
 				if userText == "⬅️ Вернуться" {
 					k.inlineMenu()
@@ -324,7 +326,7 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 					return
 				}
 
-				serialID, now, userLocation, err, testWaitingForDataReminder := r.saveReminder(ctx, chatID, cleanText)
+				serialID, now, userLocation, err, testWaitingForDataReminder, badRequest := r.saveReminder(ctx, chatID, cleanText)
 				err = h.sendReminder(ctx, serialID+1, now, userLocation, msg)
 				if err != nil {
 					if strings.Contains(err.Error(), "start must not be in the past") {
@@ -333,6 +335,9 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 						fmt.Println(chatID)
 						setUserState(chatID, "waiting_for_data_reminder")
 						fmt.Println(err)
+						cleanTextWithoutBadRequest := strings.Replace(cleanText, badRequest, "", -1)
+						cleanTextWithoutBadRequest = strings.TrimSpace(cleanTextWithoutBadRequest)
+						alertMessage = fmt.Sprintf("@%s хочет вам напомнить %s", username, cleanTextWithoutBadRequest)
 						return
 					}
 				}
@@ -378,18 +383,18 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 				msg.Text = "The remind was deleted"
 				h.bot.Send(msg)
 				return
+
 			case "waiting_for_data_reminder":
 				if dataForStatus == "own_time" {
-					_, _, _, err, _ := r.saveReminder(ctx, chatID, remindAgainText) //Ya cheta menyal, ono vrode rabotaet, ecli chto zdecb mozet but problema
+					_, _, _, err, _, _ := r.saveReminder(ctx, chatID, remindAgainText) //Ya cheta menyal, ono vrode rabotaet, ecli chto zdecb mozet but problema
 
 					if err != nil {
 						fmt.Println(err)
 					}
 					clearUserState(chatID)
 					dataForStatus = ""
-					return
+					k.openMainMenu("Напоминание успешно сохранено")
 				}
-
 				if userText == "Сохранить как заметку" {
 					r.timeReminder(ctx, chatID, "")
 					k.openMainMenu("Сохранено как заметку")
@@ -435,6 +440,7 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 				msg.Text = text
 				h.bot.Send(msg)
 				return
+
 			case "waiting_for_city":
 				coord, err := mytime.GetCoordinates(userText)
 				if err != nil {

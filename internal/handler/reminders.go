@@ -105,14 +105,14 @@ func (r *reminder) getReminders(ctx context.Context, userID int64) ([]time.Time,
 	return allTime, nil, allReminders, allDone
 }
 
-func (r *reminder) saveReminder(ctx context.Context, userID int64, reminder string)  (int64, time.Time, string, error, bool) {
+func (r *reminder) saveReminder(ctx context.Context, userID int64, reminder string)  (int64, time.Time, string, error, bool, string) {
 
 	err, i := r.countReminders(ctx, userID)
 	r.mu.Lock()
 	serialID := models.Map_id[i]
 	defer r.mu.Unlock()
 	if err != nil {
-		return 0, time.Time{}, "", fmt.Errorf("Error r.countReminders writeReminder %w", err), false
+		return 0, time.Time{}, "", fmt.Errorf("Error r.countReminders writeReminder %w", err), false, ""
 	}
 
 	userLocation := ""
@@ -120,7 +120,7 @@ func (r *reminder) saveReminder(ctx context.Context, userID int64, reminder stri
 
 		loc, err := time.LoadLocation(userLocation)
 	if err != nil {
-		return 0, time.Time{}, "", fmt.Errorf("Error time.LoadLocation writeReminder %w", err), false
+		return 0, time.Time{}, "", fmt.Errorf("Error time.LoadLocation writeReminder %w", err), false, ""
 	}
 	
 	now := time.Now().In(loc)
@@ -131,12 +131,12 @@ func (r *reminder) saveReminder(ctx context.Context, userID int64, reminder stri
 
 	result, err := w.Parse(reminder, now)
 	if err != nil {
-		return 0, time.Time{}, "", fmt.Errorf("Error w.Parse writeReminder %w", err), false
+		return 0, time.Time{}, "", fmt.Errorf("Error w.Parse writeReminder %w", err), false, ""
 	}
 	if result == nil {
 			_, err = r.db.Exec(ctx, "insert into reminders (content, user_id) values ($1, $2)", reminder, userID)
 
-		return 0, time.Time{}, "", nil, false
+		return 0, time.Time{}, "", nil, false, ""
 	}
 	var remindAt *time.Time
 	content := reminder
@@ -145,16 +145,16 @@ func (r *reminder) saveReminder(ctx context.Context, userID int64, reminder stri
 		content = strings.TrimSpace(content)
 
 	if content == "" {
-		return 0, time.Time{}, "", fmt.Errorf("Error saveReminder empty reminder text %w", err), false
+		return 0, time.Time{}, "", fmt.Errorf("Error saveReminder empty reminder text %w", err), false, ""
 	}
 
 	_, err = r.db.Exec(ctx, "insert into reminders (content, user_id, remind_at) values ($1, $2, $3)", content, userID, remindAt)
 
 	if err != nil {
-			return 0, time.Time{}, "", fmt.Errorf("Error saveReminder empty reminder text %w", err), false
+			return 0, time.Time{}, "", fmt.Errorf("Error saveReminder empty reminder text %w", err), false, ""
 	}
 
-	return serialID, result.Time, userLocation, nil, true
+	return serialID, result.Time, userLocation, nil, true, result.Text
 
 }
 
