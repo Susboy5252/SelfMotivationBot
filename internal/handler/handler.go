@@ -17,7 +17,7 @@ import (
 )
 
 var (
-	globalMentionUserID int64
+	globalMentionUserID []int64
 	alertMessage        string
 	globalIndex         int
 	remindAgainText     string
@@ -157,7 +157,8 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 			return
 
 		case "acept_remind":
-				_, _, _,err, _, _ := r.saveReminder(ctx, cb.From.ID, alertMessage)
+				serialID, now, userLocation, err, _, _ := r.saveReminder(ctx, cb.From.ID, alertMessage)
+				err = h.sendReminder(ctx, serialID+1, now, userLocation, msg)
 				if err != nil {
 				fmt.Println(err)
 				}
@@ -304,16 +305,19 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 				mentions := re.FindAllString(userText, -1)
 				cleanText := re.ReplaceAllString(userText, "")
 				cleanText = strings.TrimSpace(cleanText)
+				var result []string
 				if len(mentions) != 0 {
-					if mentions[0] != "" {
-						result := strings.ReplaceAll(mentions[0], "@", "")
-						mentionUserID, err := r.getFriendsReminder(ctx, result)
+					for i := range mentions {
+					if mentions[i] != "" {
+						result = append(result,  strings.ReplaceAll(mentions[i], "@", ""))
+					}
+				}
+				mentionUserID, err := r.getFriendsReminder(ctx, result)
 						if err != nil {
 							fmt.Println(err)
 						}
 						globalMentionUserID = mentionUserID
 						alertMessage = fmt.Sprintf("@%s хочет вам напомнить %s", username, cleanText)
-					}
 				}
 				_, problemUser, err := u.ConfirmUser(ctx, mentions)
 				if errors.Is(err, ErrUserNotFound) {
@@ -351,10 +355,12 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 					return
 				}
 				k.openMainMenu("Напомнинание успешно сохранено!")
-				msgToFriend := tgbotapi.NewMessage(globalMentionUserID, alertMessage)
+				for i := range globalMentionUserID{
+				msgToFriend := tgbotapi.NewMessage(globalMentionUserID[i], alertMessage)
 				keyboard := k.friendReminderKeybard()
 				msgToFriend.ReplyMarkup = &keyboard
 				h.bot.Send(msgToFriend)
+			}
 				keyboard, text := k.inlineMenu()
 				msg.Text = text
 				msg.ReplyMarkup = keyboard
@@ -430,10 +436,12 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 				}
 				k.openMainMenu("Напоминание сохранено")
 				alertMessage += " " + userText
-				msgToFriend := tgbotapi.NewMessage(globalMentionUserID, alertMessage)
+				for i := range globalMentionUserID{
+				msgToFriend := tgbotapi.NewMessage(globalMentionUserID[i], alertMessage)
 				keyboard := k.friendReminderKeybard()
 				msgToFriend.ReplyMarkup = &keyboard
 				h.bot.Send(msgToFriend)
+				}
 				clearUserState(chatID)
 				keyboard, text := k.inlineMenu()
 				msg.ReplyMarkup = keyboard

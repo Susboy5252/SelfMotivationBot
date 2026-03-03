@@ -213,13 +213,16 @@ func (r *reminder) changeDone(ctx context.Context, localID int) error {
 		return nil
 }
 
-func (r *reminder) getFriendsReminder (ctx context.Context, mentionedUser string) (int64, error) {
-	var mentionedUserID int64
-	row := r.db.QueryRow(ctx, "select id from users where username = $1", mentionedUser)
-	err := row.Scan(&mentionedUserID)
+func (r *reminder) getFriendsReminder (ctx context.Context, mentionedUser []string) ([]int64, error) {
+	var mentionedUserID []int64
+	var localMention int64
+	for i := range mentionedUser {
+	err := r.db.QueryRow(ctx, "select id from users where username = $1", mentionedUser[i]).Scan(&localMention)
 	if err != nil {
 		fmt.Println(mentionedUser)
-		return 0, fmt.Errorf("Errror getFriendsReminder row.Scan %w", err)
+		return []int64{}, fmt.Errorf("Errror getFriendsReminder row.Scan %w", err)
+	}
+	mentionedUserID = append(mentionedUserID, localMention)
 	}
 	return mentionedUserID, nil
 }
