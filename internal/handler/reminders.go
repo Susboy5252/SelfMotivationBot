@@ -106,17 +106,8 @@ func (r *reminder) getReminders(ctx context.Context, userID int64) ([]time.Time,
 }
 
 func (r *reminder) saveReminder(ctx context.Context, userID int64, reminder string)  (int64, time.Time, string, error, bool, string) {
-
-	err, i := r.countReminders(ctx, userID)
-	r.mu.Lock()
-	serialID := models.Map_id[i]
-	defer r.mu.Unlock()
-	if err != nil {
-		return 0, time.Time{}, "", fmt.Errorf("Error r.countReminders writeReminder %w", err), false, ""
-	}
-
 	userLocation := ""
-	err = r.db.QueryRow(ctx, "select timezone from users where id=$1", userID).Scan(&userLocation)
+	err := r.db.QueryRow(ctx, "select timezone from users where id=$1", userID).Scan(&userLocation)
 
 		loc, err := time.LoadLocation(userLocation)
 	if err != nil {
@@ -152,6 +143,13 @@ func (r *reminder) saveReminder(ctx context.Context, userID int64, reminder stri
 
 	if err != nil {
 			return 0, time.Time{}, "", fmt.Errorf("Error saveReminder empty reminder text %w", err), false, ""
+	}
+		err, i := r.countReminders(ctx, userID)
+	r.mu.Lock()
+	serialID := models.Map_id[i]
+	defer r.mu.Unlock()
+	if err != nil {
+		return 0, time.Time{}, "", fmt.Errorf("Error r.countReminders writeReminder %w", err), false, ""
 	}
 
 	return serialID, result.Time, userLocation, nil, true, result.Text

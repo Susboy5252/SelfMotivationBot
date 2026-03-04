@@ -158,7 +158,9 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 
 		case "acept_remind":
 				serialID, now, userLocation, err, _, _ := r.saveReminder(ctx, cb.From.ID, alertMessage)
-				err = h.sendReminder(ctx, serialID+1, now, userLocation, msg)
+				fmt.Println("aa1")
+				fmt.Println(serialID)
+				err = h.sendReminder(ctx, serialID, now, userLocation, msg)
 				if err != nil {
 				fmt.Println(err)
 				}
@@ -331,7 +333,7 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 				}
 
 				serialID, now, userLocation, err, testWaitingForDataReminder, badRequest := r.saveReminder(ctx, chatID, cleanText)
-				err = h.sendReminder(ctx, serialID+1, now, userLocation, msg)
+				err = h.sendReminder(ctx, serialID, now, userLocation, msg)
 				if err != nil {
 					if strings.Contains(err.Error(), "start must not be in the past") {
 						msg.Text = "Время которе вы указали, уже прошло, введите только будущее время"
@@ -513,6 +515,8 @@ func (h *handler) sendReminder(ctx context.Context, serialID int64, sendTime tim
 
 	k := newKeyboard(h.bot, msg.ChatID)
 	s, err := gocron.NewScheduler()
+	fmt.Println("SERIALID raz")
+	fmt.Println(serialID)
 	if err != nil {
 		return fmt.Errorf("Error gocron.NewSchedular sendReminder %w", err)
 	}
