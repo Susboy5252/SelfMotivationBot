@@ -298,6 +298,8 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 			switch currentState {
 
 			case "waiting_for_reminder":
+				isMentioned := false
+				isThere := false
 				if userText == "⬅️ Вернуться" {
 					k.inlineMenu()
 					return
@@ -309,7 +311,12 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 				cleanText = strings.TrimSpace(cleanText)
 				var result []string
 				if len(mentions) != 0 {
+					isMentioned = true
 					for i := range mentions {
+						if mentions[i] == "@"+update.FromChat().UserName {
+							isThere = true
+							continue
+						}
 					if mentions[i] != "" {
 						result = append(result,  strings.ReplaceAll(mentions[i], "@", ""))
 					}
@@ -332,6 +339,7 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 					return
 				}
 
+				if (isThere && isMentioned) || (!isMentioned) {
 				serialID, now, userLocation, err, testWaitingForDataReminder, badRequest := r.saveReminder(ctx, chatID, cleanText)
 				err = h.sendReminder(ctx, serialID, now, userLocation, msg)
 				if err != nil {
@@ -356,7 +364,10 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 					setUserState(chatID, "waiting_for_data_reminder")
 					return
 				}
-				k.openMainMenu("Напомнинание успешно сохранено!")
+							k.openMainMenu("Напомнинание успешно сохранено!")
+			} else {
+				k.openMainMenu("Напоминание успешно отправлено")
+			}
 				for i := range globalMentionUserID{
 				msgToFriend := tgbotapi.NewMessage(globalMentionUserID[i], alertMessage)
 				keyboard := k.friendReminderKeybard()
