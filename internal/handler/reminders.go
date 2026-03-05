@@ -25,96 +25,58 @@ func newReminder(db *pgxpool.Pool) *reminder {
 }
 
 func (r *reminder) deleteReminders(ctx context.Context,
-	localID int, userID int64) error {
-	r.countReminders(ctx, userID)
-	r.mu.Lock()
-	serialID := models.Map_id[localID]
-	defer r.mu.Unlock()
+	serialID int, userID int64) error {
 
-	_, err := r.db.Exec(ctx, "delete from reminders where id=$1", serialID)
+	_, err := r.db.Exec(ctx, "delete from reminders where id=$1 and user_id=$2", serialID, userID)
 	if err != nil {
 		return fmt.Errorf("Error Exec delete deleteReminders")
 	}
 	return nil
 }
 
-func (r *reminder) countReminders(ctx context.Context, userID int64) (error, int) {
-	query := "Select id from reminders where user_id=$1 order by id ASC"
-	rows, err := r.db.Query(ctx, query, userID)
+func (r *reminder) getReminders(ctx context.Context, userID int64) ([]models.Reminders, error) {
+	var allReminders []models.Reminders
 
-	if err != nil {
-		return fmt.Errorf("Error h.pool.Query countReminders %w", err), 0
-	}
-	defer rows.Close()
-
-	var i int
-	var reminders models.Reminders
-	for rows.Next() {
-		i++
-		err := rows.Scan(&reminders.Serial_id)
-		if err != nil {
-			return fmt.Errorf("Error rows.Scan getReminders %w", err), 0
-		}
-		r.mu.RLock()
-		models.Map_id[i] = reminders.Serial_id
-		r.mu.RUnlock()
-	}
-	return nil, i
-}
-func (r *reminder) getReminders(ctx context.Context, userID int64) ([]time.Time, error, []string, []bool) {
-	var allReminders []string
-	var allTime []time.Time
-	var allDone []bool
-	var reminders models.Reminders
-	query := "Select content, remind_at, done from reminders where user_id=$1 ORDER BY id ASC"
+	query := "Select id, content, remind_at, done from reminders where user_id=$1 ORDER BY id ASC"
 	rows, err := r.db.Query(ctx, query, userID)
 	if err != nil {
-		return []time.Time{}, fmt.Errorf("Error h.pool.Query countReminders %w", err), []string{}, []bool{}
+		return nil, fmt.Errorf("Error h.pool.Query countReminders %w", err)
 	}
 	defer rows.Close()
-	err, _ = r.countReminders(ctx, userID)
-	if err != nil {
-		return []time.Time{}, fmt.Errorf("Error countReminders %w", err), []string{}, []bool{}
-	}
-	t := 0
 	for rows.Next() {
-		err := rows.Scan(&reminders.Content, &reminders.Time, &reminders.Done)
-		t++
+		var rem models.Reminders
+		err := rows.Scan(&rem.Serial_id, &rem.Content, &rem.Time, &rem.Done)
 		if err != nil {
-			return []time.Time{}, fmt.Errorf("Error for getReminders %w", err), []string{}, []bool{}
+			return nil, fmt.Errorf("Error rows.Scan getReminders %w", err)
 		}
 		re := regexp.MustCompile(`@\w+`)
 		re1 := regexp.MustCompile(`хочет вам напомнить`)
-		mention := re.FindAllString(reminders.Content, -1)
-		withoutMentionText := re.ReplaceAllString(reminders.Content, "")
+		mention := re.FindAllString(rem.Content, -1)
+		withoutMentionText := re.ReplaceAllString(rem.Content, "")
 		re1.FindAllString(withoutMentionText, -1)
+
 		if len(mention) != 0 {
 		cleanText := re1.ReplaceAllString(withoutMentionText, "")
 		cleanText = strings.TrimSpace(cleanText)
 		if strings.Contains(cleanText, "от") {
 			cleanText += " " + mention[0]
-			cleanText = strings.TrimSpace(cleanText)
 		} else {
 			cleanText += " от " + mention[0]
-			cleanText = strings.TrimSpace(cleanText)
 		}
-			allReminders = append(allReminders, cleanText)
-	} else {
-		allReminders = append(allReminders, reminders.Content)
-	}
-		if reminders.Time != nil{	
-		allTime = append(allTime, *reminders.Time)
-		} else {
-			allTime = append(allTime, time.Time{})
-		}
-		allDone = append(allDone, reminders.Done)
-	}
-	return allTime, nil, allReminders, allDone
+		rem.Content = strings.TrimSpace(cleanText)
+	}	
+		allReminders = append(allReminders, rem)
+}
+	return allReminders, nil
 }
 
 func (r *reminder) saveReminder(ctx context.Context, userID int64, reminder string)  (int64, time.Time, string, error, bool, string) {
 	userLocation := ""
 	err := r.db.QueryRow(ctx, "select timezone from users where id=$1", userID).Scan(&userLocation)
+
+	    if err != nil {
+        return 0, time.Time{}, "", fmt.Errorf("failed to get user timezone: %w", err), false, ""
+    }
 
 		loc, err := time.LoadLocation(userLocation)
 	if err != nil {
@@ -132,79 +94,60 @@ func (r *reminder) saveReminder(ctx context.Context, userID int64, reminder stri
 		return 0, time.Time{}, "", fmt.Errorf("Error w.Parse writeReminder %w", err), false, ""
 	}
 	if result == nil {
-			_, err = r.db.Exec(ctx, "insert into reminders (content, user_id) values ($1, $2)", reminder, userID)
+		    	var id int64
+			        err = r.db.QueryRow(ctx, "INSERT INTO reminders (content, user_id) VALUES ($1, $2) RETURNING id", reminder, userID).Scan(&id)
+							        if err != nil {
+            return 0, time.Time{}, "", fmt.Errorf("failed to insert reminder without time: %w", err), false, ""
+        }
 
-		return 0, time.Time{}, "", nil, false, ""
+		return id, time.Time{}, "", nil, false, ""
 	}
-	var remindAt *time.Time
-	content := reminder
-	remindAt = &result.Time
-		content = strings.Replace(reminder, result.Text, "", 1)
-		content = strings.TrimSpace(content)
-
+    content := strings.Replace(reminder, result.Text, "", 1)
+    content = strings.TrimSpace(content)
 	if content == "" {
 		return 0, time.Time{}, "", fmt.Errorf("Error saveReminder empty reminder text %w", err), false, ""
 	}
-
-	_, err = r.db.Exec(ctx, "insert into reminders (content, user_id, remind_at) values ($1, $2, $3)", content, userID, remindAt)
+	var id int64
+	err = r.db.QueryRow(ctx, "insert into reminders (content, user_id, remind_at) values ($1, $2, $3) RETURNING id", content, userID, result.Time).Scan(&id)
 
 	if err != nil {
 			return 0, time.Time{}, "", fmt.Errorf("Error saveReminder empty reminder text %w", err), false, ""
 	}
-		err, i := r.countReminders(ctx, userID)
-	r.mu.Lock()
-	serialID := models.Map_id[i]
-	defer r.mu.Unlock()
-	if err != nil {
-		return 0, time.Time{}, "", fmt.Errorf("Error r.countReminders writeReminder %w", err), false, ""
-	}
 
-	return serialID, result.Time, userLocation, nil, true, result.Text
+	return id, result.Time, userLocation, nil, true, result.Text
 
 }
 
 func (r *reminder) timeReminder(ctx context.Context, userID int64, remind_at string) (int64, time.Time, string, error) {
-
-	err, i := r.countReminders(ctx, userID)
-	r.mu.Lock()
-	serialID := models.Map_id[i]
-	defer r.mu.Unlock()
+	var serialID int64
+	err := r.db.QueryRow(ctx, "SELECT id FROM reminders WHERE user_id=$1 ORDER BY id DESC LIMIT 1", userID).Scan(&serialID)
 	if err != nil {
-		return 0, time.Time{}, "", fmt.Errorf("Error r.countReminders writeReminder %w", err)
-	}
-	userLocation := ""
-	row := r.db.QueryRow(ctx, "select timezone from users where id=$1", userID)
-	row.Scan(&userLocation)
-	loc, err := time.LoadLocation(userLocation)
-	if err != nil {
-		return 0, time.Time{}, "", fmt.Errorf("Error time.LoadLocation writeReminder %w", err)
+		return 0, time.Time{}, "", fmt.Errorf("напоминание не найдено: %w", err)
 	}
 
+	var userLocation string
+	r.db.QueryRow(ctx, "select timezone from users where id=$1", userID).Scan(&userLocation)
+	
+	loc, _ := time.LoadLocation(userLocation)
 	now := time.Now().In(loc)
 
 	w := when.New(nil)
-
 	w.Add(ru.All...)
-
 	result, err := w.Parse(remind_at, now)
-	if err != nil {
-		return 0, time.Time{}, "", fmt.Errorf("Error w.Parse writeReminder %w", err)
-	}
-	if result == nil {
-		return 0, time.Time{}, "", nil
+	
+	if err != nil || result == nil {
+		return 0, time.Time{}, "", fmt.Errorf("не удалось распознать время")
 	}
 
 	_, err = r.db.Exec(ctx, "update reminders set remind_at=$1 where id=$2", result.Time, serialID)
-
-		if remind_at == "" {
-			return serialID, time.Time{}, userLocation, nil
+	if err != nil {
+		return 0, time.Time{}, "", err
 	}
 
 	return serialID, result.Time, userLocation, nil
 }
 
-func (r *reminder) changeDone(ctx context.Context, localID int) error {
-		serialID := models.Map_id[localID]
+func (r *reminder) changeDone(ctx context.Context, serialID int) error {
 		done := false
 		row := r.db.QueryRow(ctx, "select done from reminders where id=$1", serialID)
 		err := row.Scan(&done)

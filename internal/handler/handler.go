@@ -16,14 +16,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-var (
-	globalMentionUserID []int64
-	alertMessage        string
-	globalIndex         int
-	remindAgainText     string
-	dataForStatus       string
-)
-
 type handler struct {
 	bot  *tgbotapi.BotAPI
 	conn *pgxpool.Pool
@@ -72,13 +64,12 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 
 		if strings.HasPrefix(data, "remindme_") {
 			indexStr := strings.TrimPrefix(data, "remindme_")
-			index, err := strconv.Atoi(indexStr)
+			dbID, err := strconv.ParseInt(indexStr, 10, 64)
 			if err != nil {
 				fmt.Println(err)
 				return
 			}
-			globalIndex = index + 1
-			err, selectedKeyboard, remindNumber := k.selectedMenu(ctx, h.conn, index)
+			err, selectedKeyboard, remindNumber := k.selectedMenu(ctx, h.conn, dbID)
 
 			if err != nil {
 				fmt.Println(err)
@@ -90,13 +81,13 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 		}
 		if strings.HasPrefix(data, "remind_next") {
 			indexStr := strings.TrimPrefix(data, "remind_next_")
-			index, err := strconv.Atoi(indexStr)
+			index, err := strconv.ParseInt(indexStr, 10, 32)
 			if err != nil {
 				fmt.Println(err)
 				return
 			}
-			allTime, err, allReminders, allDone := r.getReminders(ctx, cb.Message.Chat.ID)
-			text, keyboard := k.remindersMenu(allReminders, allTime, index, allDone)
+			reminders, err := r.getReminders(ctx, cb.Message.Chat.ID)
+			text, keyboard := k.remindersMenu(reminders, index)
 			edit.Text = text
 			edit.ReplyMarkup = &keyboard
 			h.bot.Send(edit)
@@ -127,12 +118,12 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 			return
 
 		case "get_reminders":
-			allTime, err, allReminders, allDone := r.getReminders(ctx, cb.Message.Chat.ID)
+			reminders, err := r.getReminders(ctx, cb.Message.Chat.ID)
 			if err != nil {
 				log.Println(err)
 			}
 
-			text, keyboard := k.remindersMenu(allReminders, allTime, 0, allDone)
+			text, keyboard := k.remindersMenu(reminders, 0)
 			edit.Text = text
 			edit.ReplyMarkup = &keyboard
 			h.bot.Send(edit)
@@ -157,7 +148,7 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 			return
 
 		case "acept_remind":
-				serialID, now, userLocation, err, _, _ := r.saveReminder(ctx, cb.From.ID, alertMessage)
+				serialID, now, userLocation, err, _, _ := r.saveReminder(ctx, cb.From.ID, AlertMessage)
 				err = h.sendReminder(ctx, serialID, now, userLocation, msg)
 				if err != nil {
 				fmt.Println(err)
@@ -276,6 +267,7 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 		}
 	}
 	if update.Message != nil {
+		session := getSession(chatID
 		log.Printf("[%s] %s", update.Message.From.UserName, update.Message.Text)
 
 		ctx := context.Background()

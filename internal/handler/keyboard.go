@@ -48,19 +48,18 @@ func (k *keyboard) lobbyMenu() {
 	k.bot.Send(msg)
 }
 
-func (k *keyboard) remindersMenu(allreminders []string, allTime []time.Time, page int, done []bool) (string, tgbotapi.InlineKeyboardMarkup) {
+func (k *keyboard) remindersMenu(allReminders []models.Reminders, page int) (string, tgbotapi.InlineKeyboardMarkup) {
 	maxButtons := 7
 	start := page
-	end := min(page+maxButtons, len(allreminders))
-	showReminders := allreminders[start:end]
+	end := min(page+maxButtons, len(allReminders))
+	showReminders := allReminders[start:end]
 	row := make([]tgbotapi.InlineKeyboardButton, len(showReminders))
 
 	text := ""
 
-	for i := range showReminders {
-		realIndex := start + i
+	for i, rem := range showReminders {
 
-		t := allTime[realIndex]
+		t := rem.Time
 		formatted := fmt.Sprintf("%s, %d %s %d %02d:%02d",
 			mytime.Weekdays[t.Weekday()],
 			t.Day(),
@@ -70,13 +69,13 @@ func (k *keyboard) remindersMenu(allreminders []string, allTime []time.Time, pag
 			t.Minute(),
 		)
 
-		if allTime[realIndex].IsZero() {
-			text += strconv.Itoa(i+page+1) + " " + showReminders[i] + " Заметка" + "\n"
+		if rem.Time.IsZero() {
+			text += strconv.Itoa(i+page+1) + " " + rem.Content + " Заметка" + "\n"
 		} else {
-			if done[realIndex] == false {
-				text += strconv.Itoa(i+page+1) + " " + showReminders[i] + " " + formatted + " ❌" + "\n"
+			if rem.Done == false {
+				text += strconv.Itoa(i+page+1) + " " + rem.Content + " " + formatted + " ❌" + "\n"
 			} else {
-				text += strconv.Itoa(i+page+1) + " " + showReminders[i] + " " + formatted + " ✅" + "\n"
+				text += strconv.Itoa(i+page+1) + " " + rem.Content + " " + formatted + " ✅" + "\n"
 			}
 
 		}
@@ -84,7 +83,7 @@ func (k *keyboard) remindersMenu(allreminders []string, allTime []time.Time, pag
 	}
 	keyboardRows := [][]tgbotapi.InlineKeyboardButton{row}
 
-	if len(allreminders) >= 8 && page <= 6 {
+	if len(allReminders) >= 8 && page <= 6 {
 		keyboardRows = append(keyboardRows, tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("Далее", fmt.Sprintf("remind_next_%d", end))))
 
 	}
@@ -92,7 +91,7 @@ func (k *keyboard) remindersMenu(allreminders []string, allTime []time.Time, pag
 	if page >= 7 {
 		keyboardRows = append(keyboardRows, tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("Назад", fmt.Sprintf("remind_back_%d", page))))
 	}
-	if len(allreminders) > end && page >= 7 {
+	if len(allReminders) > end && page >= 7 {
 		keyboardRows[len(keyboardRows)-1] = append(keyboardRows[len(keyboardRows)-1], tgbotapi.NewInlineKeyboardButtonData("Далее", fmt.Sprintf("remind_next_%d", end)))
 	}
 	keyboardRows = append(keyboardRows, tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("⬅️ Вернуться", "go_to_menu")))
@@ -107,13 +106,10 @@ func (k *keyboard) remindersMenu(allreminders []string, allTime []time.Time, pag
 	return text, keyboard
 }
 
-func (k *keyboard) selectedMenu(ctx context.Context, db *pgxpool.Pool, remindNumber int) (error, tgbotapi.InlineKeyboardMarkup, string) {
+func (k *keyboard) selectedMenu(ctx context.Context, db *pgxpool.Pool, serialID int64) (error, tgbotapi.InlineKeyboardMarkup, string) {
 	result := ""
 	doneResult := false
 	checkRemindAt := time.Time{}
-	k.mu.Lock()
-	serialID := models.Map_id[remindNumber+1]
-	defer k.mu.Unlock()
 	row := db.QueryRow(ctx, "select content, coalesce(remind_at, '0001-01-01 00:00:00'), done from reminders where id=$1", serialID)
 	err := row.Scan(&result, &checkRemindAt, &doneResult)
 	if err != nil {
