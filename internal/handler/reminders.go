@@ -89,8 +89,15 @@ func (r *reminder) getReminders(ctx context.Context, userID int64) ([]time.Time,
 		withoutMentionText := re.ReplaceAllString(reminders.Content, "")
 		re1.FindAllString(withoutMentionText, -1)
 		if len(mention) != 0 {
-		cleanText := re1.ReplaceAllString(withoutMentionText, "") +" от " + mention[0]
+		cleanText := re1.ReplaceAllString(withoutMentionText, "")
 		cleanText = strings.TrimSpace(cleanText)
+		if strings.Contains(cleanText, "от") {
+			cleanText += " " + mention[0]
+			cleanText = strings.TrimSpace(cleanText)
+		} else {
+			cleanText += " от " + mention[0]
+			cleanText = strings.TrimSpace(cleanText)
+		}
 			allReminders = append(allReminders, cleanText)
 	} else {
 		allReminders = append(allReminders, reminders.Content)

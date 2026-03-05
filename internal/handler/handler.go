@@ -158,8 +158,6 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 
 		case "acept_remind":
 				serialID, now, userLocation, err, _, _ := r.saveReminder(ctx, cb.From.ID, alertMessage)
-				fmt.Println("aa1")
-				fmt.Println(serialID)
 				err = h.sendReminder(ctx, serialID, now, userLocation, msg)
 				if err != nil {
 				fmt.Println(err)
@@ -368,12 +366,14 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 			} else {
 				k.openMainMenu("Напоминание успешно отправлено")
 			}
-				for i := range globalMentionUserID{
+				if isMentioned {
+				for i := range globalMentionUserID {
 				msgToFriend := tgbotapi.NewMessage(globalMentionUserID[i], alertMessage)
 				keyboard := k.friendReminderKeybard()
 				msgToFriend.ReplyMarkup = &keyboard
 				h.bot.Send(msgToFriend)
 			}
+		}
 				keyboard, text := k.inlineMenu()
 				msg.Text = text
 				msg.ReplyMarkup = keyboard
@@ -546,6 +546,13 @@ func (h *handler) sendReminder(ctx context.Context, serialID int64, sendTime tim
 		return err
 
 	}
+			re := regexp.MustCompile(`@\w+`)
+		re1 := regexp.MustCompile(`хочет вам напомнить`)
+		mention := re.FindAllString(m, -1)
+		withoutMentionText := re.ReplaceAllString(m, "")
+		re1.FindAllString(withoutMentionText, -1)
+		cleanText := re1.ReplaceAllString(withoutMentionText, "") +" от " + mention[0]
+		cleanText = strings.TrimSpace(cleanText)
 	var check string
 	var result int
 	checkTime := time.Date(sendTime.Year(), sendTime.Month(), sendTime.Day(), sendTime.Hour(), sendTime.Minute(), sendTime.Second(), 0, loc)
@@ -562,8 +569,8 @@ func (h *handler) sendReminder(ctx context.Context, serialID int64, sendTime tim
 			fmt.Println("Compare result:", result)
 
 			if result == 0 {
-				k.remindAgain(msg.Text)
-				remindAgainText = msg.Text
+				k.remindAgain(cleanText)
+				remindAgainText = cleanText
 			}
 		}),
 	)
