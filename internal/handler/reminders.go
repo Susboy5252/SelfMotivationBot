@@ -25,7 +25,7 @@ func newReminder(db *pgxpool.Pool) *reminder {
 }
 
 func (r *reminder) deleteReminders(ctx context.Context,
-	serialID int, userID int64) error {
+	serialID int64, userID int64) error {
 
 	_, err := r.db.Exec(ctx, "delete from reminders where id=$1 and user_id=$2", serialID, userID)
 	if err != nil {
@@ -147,7 +147,7 @@ func (r *reminder) timeReminder(ctx context.Context, userID int64, remind_at str
 	return serialID, result.Time, userLocation, nil
 }
 
-func (r *reminder) changeDone(ctx context.Context, serialID int) error {
+func (r *reminder) changeDone(ctx context.Context, serialID int64) error {
 		done := false
 		row := r.db.QueryRow(ctx, "select done from reminders where id=$1", serialID)
 		err := row.Scan(&done)
