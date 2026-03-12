@@ -56,11 +56,15 @@ func (k *keyboard) remindersMenu(allReminders []models.Reminders, page int) (str
 	row := make([]tgbotapi.InlineKeyboardButton, len(showReminders))
 
 	text := ""
+	formatted := ""
+
 
 	for i, rem := range showReminders {
-
-		t := rem.Time
-		formatted := fmt.Sprintf("%s, %d %s %d %02d:%02d",
+				if rem.Time == nil || rem.Time.IsZero() {
+		text += strconv.Itoa(i+page+1) + " " + rem.Content + " Заметка\n"
+	} else {
+		t := *rem.Time
+		formatted = fmt.Sprintf("%s, %d %s %d %02d:%02d",
 			mytime.Weekdays[t.Weekday()],
 			t.Day(),
 			mytime.Months[t.Month()],
@@ -68,18 +72,14 @@ func (k *keyboard) remindersMenu(allReminders []models.Reminders, page int) (str
 			t.Hour(),
 			t.Minute(),
 		)
-
-		if rem.Time.IsZero() {
-			text += strconv.Itoa(i+page+1) + " " + rem.Content + " Заметка" + "\n"
-		} else {
+	}
 			if rem.Done == false {
 				text += strconv.Itoa(i+page+1) + " " + rem.Content + " " + formatted + " ❌" + "\n"
 			} else {
 				text += strconv.Itoa(i+page+1) + " " + rem.Content + " " + formatted + " ✅" + "\n"
-			}
 
 		}
-		row[i] = tgbotapi.NewInlineKeyboardButtonData(strconv.Itoa(page+i+1), fmt.Sprintf("remindme_%d", page+i))
+		row[i] = tgbotapi.NewInlineKeyboardButtonData(strconv.Itoa(page+i+1), fmt.Sprintf("remindme_%d", rem.Serial_id))
 	}
 	keyboardRows := [][]tgbotapi.InlineKeyboardButton{row}
 
@@ -111,6 +111,7 @@ func (k *keyboard) selectedMenu(ctx context.Context, db *pgxpool.Pool, serialID 
 	doneResult := false
 	checkRemindAt := time.Time{}
 	row := db.QueryRow(ctx, "select content, coalesce(remind_at, '0001-01-01 00:00:00'), done from reminders where id=$1", serialID)
+	fmt.Println(serialID)
 	err := row.Scan(&result, &checkRemindAt, &doneResult)
 	if err != nil {
 		return fmt.Errorf("Erorr row.scan selectedMenu %w", err),
@@ -124,15 +125,15 @@ func (k *keyboard) selectedMenu(ctx context.Context, db *pgxpool.Pool, serialID 
 	if checkRemindAt.IsZero() {
 		keyboard = tgbotapi.NewInlineKeyboardMarkup(
 			tgbotapi.NewInlineKeyboardRow(
-				tgbotapi.NewInlineKeyboardButtonData("Удалить", "delete_reminder"),
+				tgbotapi.NewInlineKeyboardButtonData("Удалить", fmt.Sprintf("delete_reminder_%d", serialID)),
 			),
 			tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("Назад ->", "back_to_reminders")),
 		)
 	} else {
 		keyboard = tgbotapi.NewInlineKeyboardMarkup(
 			tgbotapi.NewInlineKeyboardRow(
-				tgbotapi.NewInlineKeyboardButtonData("Удалить", "delete_reminder"),
-				tgbotapi.NewInlineKeyboardButtonData(statusText, "done"),
+				tgbotapi.NewInlineKeyboardButtonData("Удалить", fmt.Sprintf("delete_reminder_%d", serialID)),
+				tgbotapi.NewInlineKeyboardButtonData(statusText, fmt.Sprintf("done_%d", serialID)),
 			),
 			tgbotapi.NewInlineKeyboardRow(tgbotapi.NewInlineKeyboardButtonData("Назад ->", "back_to_reminders")),
 		)
@@ -167,10 +168,10 @@ func (k *keyboard) Back() tgbotapi.InlineKeyboardMarkup {
 	return keyboard
 }
 
-func (k *keyboard) sureDelete() tgbotapi.InlineKeyboardMarkup {
+func (k *keyboard) sureDelete(serialID int64) tgbotapi.InlineKeyboardMarkup {
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("Да", "sure_delete"),
+			tgbotapi.NewInlineKeyboardButtonData("Да", fmt.Sprintf("sure_delete_%d", serialID)),
 			tgbotapi.NewInlineKeyboardButtonData("Нет", "back_to_reminders"),
 		),
 	)

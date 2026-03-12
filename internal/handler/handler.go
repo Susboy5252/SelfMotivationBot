@@ -107,13 +107,68 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 			edit.ReplyMarkup = &keyboard
 			h.bot.Send(edit)
 		}
+	  if strings.HasPrefix(data, "delete_reminder") {
+			indexStr := strings.TrimPrefix(data, "delete_reminder_")
+			index, err := strconv.ParseInt(indexStr, 10, 64)
+			if err != nil {
+				fmt.Println(err)
+				fmt.Println("herereee " + indexStr + " " + data)
+				return
+			}
+			keyboard := k.sureDelete(index)
+			edit.Text = "Вы точно хотите удалить заметку?"
+			edit.ReplyMarkup = &keyboard
+			h.bot.Send(edit)
+			return
+
+		}
+
+		if strings.HasPrefix(data, "sure_delete") {
+			indexStr := strings.TrimPrefix(data, "sure_delete_")
+			index, err := strconv.ParseInt(indexStr, 10, 64)
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+			r.deleteReminders(ctx, index, cb.Message.Chat.ID)
+			h.backToReminders(ctx, cb, r, k)
+			return
+
+		}
+
+		if strings.HasPrefix(data, "done_") {
+			indexStr := strings.TrimPrefix(data, "done_")
+			index, err := strconv.ParseInt(indexStr, 10, 64)
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+						err = r.changeDone(ctx, index)
+			alert := tgbotapi.NewCallback(cb.ID, "Стаутс был изменен")
+			h.bot.Request(alert)
+			if err != nil {
+				fmt.Println(err)
+			}
+
+			err, selectedKeyboard, remindNumber := k.selectedMenu(ctx, h.conn, index)
+
+			if err != nil {
+				fmt.Println(err)
+				return
+			}
+			edit.Text = remindNumber
+			edit.ReplyMarkup = &selectedKeyboard
+			h.bot.Send(edit)
+			return
+		}
 
 		switch data {
 
 		case "go_to_menu":
 			keyboard, text := k.inlineMenu()
 			edit.Text = text
-			clearUserState(cb.Message.Chat.ID)
+			session.State = ""
+			setSession(cb.From.ID, session)
 			edit.ReplyMarkup = &keyboard
 			h.bot.Send(edit)
 			return
@@ -133,7 +188,8 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 		case "find_local_zone":
 			edit.Text = "Введите ваш город. Пример:Лондон, Киев, Москва"
 			h.bot.Send(edit)
-			setUserState(cb.Message.Chat.ID, "waiting_for_city")
+			session.State = "waiting_for_city"
+			setSession(cb.Message.Chat.ID, session)
 			return
 
 		case "settings":
@@ -157,7 +213,8 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 				k.openMainMenu("Напоминание друга, успешно сохранено!")
 			keyboard, text := k.inlineMenu()
 			edit.Text = text
-			clearUserState(cb.Message.Chat.ID)
+			session.State = ""
+			setSession(cb.From.ID, session)
 			edit.ReplyMarkup = &keyboard
 			h.bot.Send(edit)
 
@@ -180,7 +237,8 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 			fmt.Println(username)
 			edit.Text = fmt.Sprintf("⏰ О чем тебе напомнить? Напиши текст напоминания. Вы можете делать совместные напоминания, отмечайте знакомых(и себя если хотите для себя сохранить это напоминание) Например:\nзабрать посылку @SelfMotivationBot,\nВыучить програмирование @SelfMotivationBot %s.\nПользователь обязательно должен пользоватся ботом и иметь '@' username", username)
 			h.bot.Send(edit)
-			setUserState(cb.Message.Chat.ID, "waiting_for_reminder")
+			session.State = "waiting_for_reminder"
+			setSession(cb.Message.Chat.ID, session)
 			return
 
 		case "own_time":
@@ -190,7 +248,8 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 			h.bot.Send(msg)
 			session.DataForStatus = "own_time"
 			setSession(cb.From.ID, session)
-			setUserState(cb.Message.Chat.ID, "waiting_for_data_reminder")
+			session.State = "waiting_for_data_reminder"
+			setSession(cb.Message.Chat.ID, session)
 			return
 
 		case "in_halfhour":
@@ -234,53 +293,6 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 			_ = h.sendReminder(ctx, serialID, now, userLocation, msg, session, cb.From.ID)
 			return
 
-		case "done":
-			if strings.HasPrefix(data, "remindme_") {
-    // Извлекаем SerialID из строки (отрезаем префикс "remindme_")
-    idStr := strings.TrimPrefix(data, "remindme_")
-    serialID, err := strconv.ParseInt(idStr, 10, 64)
-    if err != nil {
-        log.Printf("Ошибка парсинга SerialID: %v", err)
-        return
-    }
-			err = r.changeDone(ctx, serialID)
-			alert := tgbotapi.NewCallback(cb.ID, "Стаутс был изменен")
-			h.bot.Request(alert)
-			if err != nil {
-				fmt.Println(err)
-			}
-
-			err, selectedKeyboard, remindNumber := k.selectedMenu(ctx, h.conn, serialID-1)
-
-			if err != nil {
-				fmt.Println(err)
-				return
-			}
-			edit.Text = remindNumber
-			edit.ReplyMarkup = &selectedKeyboard
-			h.bot.Send(edit)
-		}
-
-			return
-
-		case "delete_reminder":
-			keyboard := k.sureDelete()
-			edit.Text = "Вы точно хотите удалить заметку?"
-			edit.ReplyMarkup = &keyboard
-			h.bot.Send(edit)
-			return
-		case "sure_delete":
-			if strings.HasPrefix(data, "remindme_") {
-    idStr := strings.TrimPrefix(data, "remindme_")
-    serialID, err := strconv.ParseInt(idStr, 10, 64)
-    if err != nil {
-        log.Printf("Ошибка парсинга SerialID: %v", err)
-        return
-    }
-			r.deleteReminders(ctx, serialID, cb.Message.Chat.ID)
-			h.backToReminders(ctx, cb, r, k)
-		}
-			return
 		case "back_to_reminders":
 			h.backToReminders(ctx, cb, r, k)
 		}
@@ -300,11 +312,10 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 
 		msg := tgbotapi.NewMessage(update.Message.Chat.ID, "")
 		msg.ParseMode = tgbotapi.ModeHTML
-		currentState := getUserState(chatID)
 		session := getSession(chatID)
 
-		if currentState != "" {
-			switch currentState {
+		if session.State != "" {
+			switch session.State {
 
 			case "waiting_for_reminder":
 				isMentioned := false
@@ -342,7 +353,8 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 				if errors.Is(err, ErrUserNotFound) {
 					msg.Text = fmt.Sprintf("Пользователь %s не пользуется этим ботом, введите напоминание еще раз", problemUser)
 					h.bot.Send(msg)
-					setUserState(chatID, "waiting_for_reminder")
+					session.State = "waiting_for_data_reminder"
+					setSession(chatID, session)
 				}
 				if err != nil {
 					fmt.Println(err)
@@ -357,7 +369,8 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 						msg.Text = "Время которе вы указали, уже прошло, введите только будущее время"
 						h.bot.Send(msg)
 						fmt.Println(chatID)
-						setUserState(chatID, "waiting_for_data_reminder")
+						session.State = "waiting_for_data_reminder"
+						setSession(chatID, session)
 						fmt.Println(err)
 						cleanTextWithoutBadRequest := strings.Replace(cleanText, badRequest, "", -1)
 						cleanTextWithoutBadRequest = strings.TrimSpace(cleanTextWithoutBadRequest)
@@ -372,7 +385,8 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 				if !testWaitingForDataReminder {
 					k.saveNote("<b>Напишите когда отправить напоминание</b>. Пример\nсегодня в 16:00, завтра в 9,\n" +
 						"через 10 минут, через 2 часа,\n5 февраля в 14:00, 12.03.2026 в 10")
-					setUserState(chatID, "waiting_for_data_reminder")
+					session.State = "waiting_for_data_reminder"
+					setSession(chatID, session)
 					return
 				}
 							k.openMainMenu("Напомнинание успешно сохранено!")
@@ -391,7 +405,8 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 				msg.Text = text
 				msg.ReplyMarkup = keyboard
 				h.bot.Send(msg)
-				clearUserState(chatID)
+				session.State = ""
+				setSession(chatID, session)
 				return
 
 			case "waiting_for_plan":
@@ -403,7 +418,8 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 
 			case "waiting_for_deleting_remind":
 				localID, err := strconv.ParseInt(userText, 10, 64)
-				clearUserState(chatID)
+				session.State = ""
+				setSession(chatID, session)
 				if err != nil {
 					msg.Text = "Write a number of remind you want to delete"
 					h.bot.Send(msg)
@@ -423,7 +439,8 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 					if err != nil {
 						fmt.Println(err)
 					}
-					clearUserState(chatID)
+					session.State = ""
+					setSession(chatID, session)
 					session.DataForStatus = ""
 					setSession(chatID, session)
 					k.openMainMenu("Напоминание успешно сохранено")
@@ -435,7 +452,8 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 					msg.Text = text
 					msg.ReplyMarkup = keyboard
 					h.bot.Send(msg)
-					clearUserState(chatID)
+					session.State = ""
+				  setSession(chatID, session)
 					return
 				}
 				serialID, now, userLocation, err := r.timeReminder(ctx, chatID, userText)
@@ -448,7 +466,8 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 						msg.Text = "Время которе вы указали, уже прошло, введите будущее время"
 						h.bot.Send(msg)
 						fmt.Println(chatID)
-						setUserState(chatID, "waiting_for_data_reminder")
+						session.State = "waiting_for_data_reminder"
+						setSession(chatID, session)
 						fmt.Println(err)
 						return
 					}
@@ -457,7 +476,8 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 						"Примеры:\n" +
 						"сегодня в 16:00, завтра в 9\nчерез 10 минут, через 2 часа\n5 февраля в 14:00, 12.03.2026 в 10"
 					h.bot.Send(msg)
-					setUserState(chatID, "waiting_for_data_reminder")
+					session.State = "waiting_for_data_reminder"
+					setSession(chatID, session)
 					fmt.Println(err)
 					return
 				}
@@ -470,7 +490,8 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 				msgToFriend.ReplyMarkup = &keyboard
 				h.bot.Send(msgToFriend)
 				}
-				clearUserState(chatID)
+				session.State = ""
+				setSession(chatID, session)
 				keyboard, text := k.inlineMenu()
 				msg.ReplyMarkup = keyboard
 				msg.Text = text
@@ -493,7 +514,8 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 					h.bot.Send(msg)
 					return
 				}
-				clearUserState(chatID)
+				session.State = ""
+				setSession(chatID, session)
 				localTime, err := mytime.GetUserLocalTimeZone(timez)
 				if err != nil {
 					log.Println(fmt.Errorf("Error :%w", err))
@@ -530,7 +552,8 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 			switch update.Message.Command() {
 			case "start":
 				k.emptyMenu("Привет пользователь! Пожалуйста введи свой город, что бы узнать твой часовой пояс")
-				setUserState(chatID, "waiting_for_city")
+				session.State = "waiting_for_city"
+				setSession(chatID, session)
 				return
 			}
 		}
@@ -565,8 +588,13 @@ func (h *handler) sendReminder(ctx context.Context, serialID int64, sendTime tim
 		re1 := regexp.MustCompile(`хочет вам напомнить`)
 		mention := re.FindAllString(m, -1)
 		withoutMentionText := re.ReplaceAllString(m, "")
-		re1.FindAllString(withoutMentionText, -1)
-		cleanText := re1.ReplaceAllString(withoutMentionText, "") +" от " + mention[0]
+		//re1.FindAllString(withoutMentionText, -1)
+		var cleanText string
+		if len(mention) > 0 {
+			cleanText = re1.ReplaceAllString(withoutMentionText, "") +" от " + mention[0]
+} else {
+	cleanText = re1.ReplaceAllString(withoutMentionText, "")
+}
 		cleanText = strings.TrimSpace(cleanText)
 	var check string
 	var result int
@@ -588,6 +616,8 @@ func (h *handler) sendReminder(ctx context.Context, serialID int64, sendTime tim
 				session.RemindAgainText = cleanText
 				setSession(chatID, session)
 			}
+
+		s.Shutdown()
 		}),
 	)
 	if err != nil {
