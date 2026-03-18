@@ -192,7 +192,7 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 			setSession(cb.Message.Chat.ID, session)
 			return
 
-		case "settings":
+		case"settings":
 			timeZone, err := t.GetUserTimeZone(ctx, cb.Message.Chat.ID)
 			localTime, _ := mytime.GetUserLocalTimeZone(timeZone)
 			if err != nil {
@@ -207,6 +207,7 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 		case "acept_remind":
 				serialID, now, userLocation, err, _, _ := r.saveReminder(ctx, cb.From.ID, session.AlertMessage)
 				err = h.sendReminder(ctx, serialID, now, userLocation, msg, session, cb.From.ID)
+				
 				if err != nil {
 				fmt.Println(err)
 				}
@@ -319,7 +320,6 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 
 			case "waiting_for_reminder":
 				isMentioned := false
-				isThere := false
 				if userText == "⬅️ Вернуться" {
 					k.inlineMenu()
 					return
@@ -333,8 +333,7 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 				if len(mentions) != 0 {
 					isMentioned = true
 					for i := range mentions {
-						if mentions[i] == "@"+update.FromChat().UserName {
-							isThere = true
+						if mentions[i] == "@" + update.FromChat().UserName {
 							continue
 						}
 					if mentions[i] != "" {
@@ -346,23 +345,33 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 							fmt.Println(err)
 						}
 						session.GlobalMentionUserIDs = mentionUserID
+						setSession(chatID, session)
+
 						session.AlertMessage = fmt.Sprintf("@%s хочет вам напомнить %s", username, cleanText)
 				}
-						setSession(chatID, session)
+			//			for x := range session.GlobalMentionUserIDs{
+				//		setSession(int64(x), session)
+
+					//	}
 				_, problemUser, err := u.ConfirmUser(ctx, mentions)
 				if errors.Is(err, ErrUserNotFound) {
 					msg.Text = fmt.Sprintf("Пользователь %s не пользуется этим ботом, введите напоминание еще раз", problemUser)
 					h.bot.Send(msg)
-					session.State = "waiting_for_data_reminder"
+					session.State = "waiting_for_reminder" //It was "waiting_for_data_reminder"
 					setSession(chatID, session)
 				}
 				if err != nil {
 					fmt.Println(err)
 					return
 				}
-
-				if (isThere && isMentioned) || (!isMentioned) {
 				serialID, now, userLocation, err, testWaitingForDataReminder, badRequest := r.saveReminder(ctx, chatID, cleanText)
+				if now.IsZero() {
+					k.saveNote("<b>Напишите когда отправить напоминание</b>. Пример\nсегодня в 16:00, завтра в 9,\n" +
+						"через 10 минут, через 2 часа,\n5 февраля в 14:00, 12.03.2026 в 10\nЛибо вы можете сохранить как замтку")
+					session.State = "waiting_for_data_reminder"
+					setSession(chatID, session)
+					return
+				}
 				err = h.sendReminder(ctx, serialID, now, userLocation, msg, session, chatID)
 				if err != nil {
 					if strings.Contains(err.Error(), "start must not be in the past") {
@@ -379,9 +388,6 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 						return
 					}
 				}
-				if err != nil {
-					fmt.Println(err)
-				}
 				if !testWaitingForDataReminder {
 					k.saveNote("<b>Напишите когда отправить напоминание</b>. Пример\nсегодня в 16:00, завтра в 9,\n" +
 						"через 10 минут, через 2 часа,\n5 февраля в 14:00, 12.03.2026 в 10")
@@ -390,12 +396,10 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 					return
 				}
 							k.openMainMenu("Напомнинание успешно сохранено!")
-			} else {
-				k.openMainMenu("Напоминание успешно отправлено")
-			}
 				if isMentioned {
 				for i := range session.GlobalMentionUserIDs {
 				msgToFriend := tgbotapi.NewMessage(session.GlobalMentionUserIDs[i], session.AlertMessage)
+				setSession(session.GlobalMentionUserIDs[i], session)
 				keyboard := k.friendReminderKeybard()
 				msgToFriend.ReplyMarkup = &keyboard
 				h.bot.Send(msgToFriend)
@@ -460,6 +464,13 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 				if err != nil {
 					fmt.Println(err)
 				}
+				if now.IsZero() {
+					k.saveNote("<b>Напишите когда отправить напоминание</b>. Пример\nсегодня в 16:00, завтра в 9,\n" +
+						"через 10 минут, через 2 часа,\n5 февраля в 14:00, 12.03.2026 в 10\nЛибо вы можете сохранить как замтку")
+					session.State = "waiting_for_data_reminder"
+					setSession(chatID, session)
+					return
+				}
 				err = h.sendReminder(ctx, serialID, now, userLocation, msg, session, chatID)
 				if err != nil {
 					if strings.Contains(err.Error(), "start must not be in the past") {
@@ -482,10 +493,17 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 					return
 				}
 				k.openMainMenu("Напоминание сохранено")
-				session.AlertMessage += " " + userText
+				formatted := fmt.Sprintf("%d %s %02d:%02d",
+			now.Day(),
+			mytime.Months[now.Month()],
+			now.Hour(),
+			now.Minute(),
+		)
+				session.AlertMessage += " " + formatted //ZDECP MOMETAT
 				setSession(chatID, session)
 				for i := range session.GlobalMentionUserIDs{
 				msgToFriend := tgbotapi.NewMessage(session.GlobalMentionUserIDs[i], session.AlertMessage)
+				setSession(session.GlobalMentionUserIDs[i], session)
 				keyboard := k.friendReminderKeybard()
 				msgToFriend.ReplyMarkup = &keyboard
 				h.bot.Send(msgToFriend)
@@ -561,11 +579,8 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 }
 
 func (h *handler) sendReminder(ctx context.Context, serialID int64, sendTime time.Time, timezone string, msg tgbotapi.MessageConfig,session UserSession, chatID int64) error {
-
 	k := newKeyboard(h.bot, msg.ChatID)
 	s, err := gocron.NewScheduler()
-	fmt.Println("SERIALID raz")
-	fmt.Println(serialID)
 	if err != nil {
 		return fmt.Errorf("Error gocron.NewSchedular sendReminder %w", err)
 	}
@@ -620,9 +635,6 @@ func (h *handler) sendReminder(ctx context.Context, serialID int64, sendTime tim
 		s.Shutdown()
 		}),
 	)
-	if err != nil {
-		return fmt.Errorf("Error s.NewJob sendReminder %w", err)
-	}
 	if err != nil {
 		return fmt.Errorf("Error s.NewJob sendReminder %w", err)
 	}
