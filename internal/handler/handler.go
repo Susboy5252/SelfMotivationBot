@@ -398,8 +398,11 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 							k.openMainMenu("Напомнинание успешно сохранено!")
 				if isMentioned {
 				for i := range session.GlobalMentionUserIDs {
+
 				msgToFriend := tgbotapi.NewMessage(session.GlobalMentionUserIDs[i], session.AlertMessage)
-				setSession(session.GlobalMentionUserIDs[i], session)
+				friendSession := getSession(session.GlobalMentionUserIDs[i])
+				friendSession.AlertMessage = session.AlertMessage
+				setSession(session.GlobalMentionUserIDs[i], friendSession)
 				keyboard := k.friendReminderKeybard()
 				msgToFriend.ReplyMarkup = &keyboard
 				h.bot.Send(msgToFriend)
@@ -493,17 +496,23 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 					return
 				}
 				k.openMainMenu("Напоминание сохранено")
-				formatted := fmt.Sprintf("%d %s %02d:%02d",
+				formatted := fmt.Sprintf("%s, %d %s %d %02d:%02d",
+			mytime.Weekdays[now.Weekday()],
 			now.Day(),
 			mytime.Months[now.Month()],
+			now.Year(),
 			now.Hour(),
 			now.Minute(),
 		)
-				session.AlertMessage += " " + formatted //ZDECP MOMETAT
+				session.AlertMessage += " " + formatted
 				setSession(chatID, session)
 				for i := range session.GlobalMentionUserIDs{
 				msgToFriend := tgbotapi.NewMessage(session.GlobalMentionUserIDs[i], session.AlertMessage)
-				setSession(session.GlobalMentionUserIDs[i], session)
+				msgToFriend.ParseMode = ""
+				friendSession := getSession(session.GlobalMentionUserIDs[i])
+				friendSession.AlertMessage = session.AlertMessage
+				fmt.Println("session1:" + friendSession.AlertMessage)
+				setSession(session.GlobalMentionUserIDs[i], friendSession)
 				keyboard := k.friendReminderKeybard()
 				msgToFriend.ReplyMarkup = &keyboard
 				h.bot.Send(msgToFriend)
