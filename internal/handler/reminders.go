@@ -90,9 +90,6 @@ func (r *reminder) saveReminder(ctx context.Context, userID int64, reminder stri
 	w.Add(ru.All...)
 
 	result, err := w.Parse(reminder, now)
-	fmt.Println(reminder)
-	fmt.Println(result)
-	fmt.Println("Helloa")
 
 	if err != nil {
 		return 0, time.Time{}, "", fmt.Errorf("Error w.Parse writeReminder %w", err), false, ""

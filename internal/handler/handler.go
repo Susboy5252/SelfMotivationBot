@@ -453,7 +453,6 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 					k.openMainMenu("Напоминание успешно сохранено")
 				}
 				if userText == "Сохранить как заметку" {
-					r.timeReminder(ctx, chatID, "")
 					k.openMainMenu("Сохранено как заметку")
 					keyboard, text := k.inlineMenu()
 					msg.Text = text
@@ -496,7 +495,7 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 					return
 				}
 				k.openMainMenu("Напоминание сохранено")
-				formatted := fmt.Sprintf("%s, %d %s %d %02d:%02d",
+				formatted := fmt.Sprintf("%s, %d %s %d в %02d:%02d",
 			mytime.Weekdays[now.Weekday()],
 			now.Day(),
 			mytime.Months[now.Month()],
