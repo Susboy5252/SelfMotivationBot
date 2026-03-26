@@ -58,25 +58,24 @@ func (k *keyboard) remindersMenu(allReminders []models.Reminders, page int) (str
 	text := ""
 	formatted := ""
 
-
 	for i, rem := range showReminders {
-				if rem.Time == nil || rem.Time.IsZero() {
-		text += strconv.Itoa(i+page+1) + " " + rem.Content + " Заметка\n"
-	} else {
-		t := *rem.Time
-		formatted = fmt.Sprintf("%s, %d %s %d %02d:%02d",
-			mytime.Weekdays[t.Weekday()],
-			t.Day(),
-			mytime.Months[t.Month()],
-			t.Year(),
-			t.Hour(),
-			t.Minute(),
-		)
-	}
-			if rem.Done == false {
-				text += strconv.Itoa(i+page+1) + " " + rem.Content + " " + formatted + " ❌" + "\n"
-			} else {
-				text += strconv.Itoa(i+page+1) + " " + rem.Content + " " + formatted + " ✅" + "\n"
+		if rem.Time == nil || rem.Time.IsZero() {
+			formatted = "Заметка"
+		} else {
+			t := *rem.Time
+			formatted = fmt.Sprintf("%s, %d %s %d %02d:%02d",
+				mytime.Weekdays[t.Weekday()],
+				t.Day(),
+				mytime.Months[t.Month()],
+				t.Year(),
+				t.Hour(),
+				t.Minute(),
+			)
+		}
+		if rem.Done == false {
+			text += strconv.Itoa(i+page+1) + " " + rem.Content + " " + formatted + " ❌" + "\n"
+		} else {
+			text += strconv.Itoa(i+page+1) + " " + rem.Content + " " + formatted + " ✅" + "\n"
 
 		}
 		row[i] = tgbotapi.NewInlineKeyboardButtonData(strconv.Itoa(page+i+1), fmt.Sprintf("remindme_%d", rem.Serial_id))

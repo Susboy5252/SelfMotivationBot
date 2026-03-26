@@ -107,7 +107,7 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 			edit.ReplyMarkup = &keyboard
 			h.bot.Send(edit)
 		}
-	  if strings.HasPrefix(data, "delete_reminder") {
+		if strings.HasPrefix(data, "delete_reminder") {
 			indexStr := strings.TrimPrefix(data, "delete_reminder_")
 			index, err := strconv.ParseInt(indexStr, 10, 64)
 			if err != nil {
@@ -143,7 +143,7 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 				fmt.Println(err)
 				return
 			}
-						err = r.changeDone(ctx, index)
+			err = r.changeDone(ctx, index)
 			alert := tgbotapi.NewCallback(cb.ID, "Стаутс был изменен")
 			h.bot.Request(alert)
 			if err != nil {
@@ -178,7 +178,6 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 			if err != nil {
 				log.Println(err)
 			}
-
 			text, keyboard := k.remindersMenu(reminders, 0)
 			edit.Text = text
 			edit.ReplyMarkup = &keyboard
@@ -192,7 +191,7 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 			setSession(cb.Message.Chat.ID, session)
 			return
 
-		case"settings":
+		case "settings":
 			timeZone, err := t.GetUserTimeZone(ctx, cb.Message.Chat.ID)
 			localTime, _ := mytime.GetUserLocalTimeZone(timeZone)
 			if err != nil {
@@ -205,13 +204,13 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 			return
 
 		case "acept_remind":
-				serialID, now, userLocation, err, _, _ := r.saveReminder(ctx, cb.From.ID, session.AlertMessage)
-				err = h.sendReminder(ctx, serialID, now, userLocation, msg, session, cb.From.ID)
-				
-				if err != nil {
+			serialID, now, userLocation, err, _, _ := r.saveReminder(ctx, cb.From.ID, session.AlertMessage)
+			err = h.sendReminder(ctx, serialID, now, userLocation, msg, session, cb.From.ID)
+
+			if err != nil {
 				fmt.Println(err)
-				}
-				k.openMainMenu("Напоминание друга, успешно сохранено!")
+			}
+			k.openMainMenu("Напоминание друга, успешно сохранено!")
 			keyboard, text := k.inlineMenu()
 			edit.Text = text
 			session.State = ""
@@ -245,7 +244,7 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 		case "own_time":
 			msg.Text = "<b>Напишите когда отправить вам напоминание</b>. Пример\nсегодня в 16:00, завтра в 9\n" +
 				"через 10 минут, через 2 часа\n5 февраля в 14:00, 12.03.2026 в 10"
-				msg.ParseMode = tgbotapi.ModeHTML
+			msg.ParseMode = tgbotapi.ModeHTML
 			h.bot.Send(msg)
 			session.DataForStatus = "own_time"
 			setSession(cb.From.ID, session)
@@ -320,6 +319,7 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 
 			case "waiting_for_reminder":
 				isMentioned := false
+				isThere := false
 				if userText == "⬅️ Вернуться" {
 					k.inlineMenu()
 					return
@@ -333,26 +333,27 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 				if len(mentions) != 0 {
 					isMentioned = true
 					for i := range mentions {
-						if mentions[i] == "@" + update.FromChat().UserName {
+						if mentions[i] == "@"+update.FromChat().UserName {
+							isThere = true
 							continue
 						}
-					if mentions[i] != "" {
-						result = append(result,  strings.ReplaceAll(mentions[i], "@", ""))
-					}
-				}
-				mentionUserID, err := r.getFriendsReminder(ctx, result)
-						if err != nil {
-							fmt.Println(err)
+						if mentions[i] != "" {
+							result = append(result, strings.ReplaceAll(mentions[i], "@", ""))
 						}
-						session.GlobalMentionUserIDs = mentionUserID
-						setSession(chatID, session)
+					}
+					mentionUserID, err := r.getFriendsReminder(ctx, result)
+					if err != nil {
+						fmt.Println(err)
+					}
+					session.GlobalMentionUserIDs = mentionUserID
+					setSession(chatID, session)
 
-						session.AlertMessage = fmt.Sprintf("@%s хочет вам напомнить %s", username, cleanText)
+					session.AlertMessage = fmt.Sprintf("@%s хочет вам напомнить %s", username, cleanText)
 				}
-			//			for x := range session.GlobalMentionUserIDs{
+				//			for x := range session.GlobalMentionUserIDs{
 				//		setSession(int64(x), session)
 
-					//	}
+				//	}
 				_, problemUser, err := u.ConfirmUser(ctx, mentions)
 				if errors.Is(err, ErrUserNotFound) {
 					msg.Text = fmt.Sprintf("Пользователь %s не пользуется этим ботом, введите напоминание еще раз", problemUser)
@@ -364,50 +365,51 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 					fmt.Println(err)
 					return
 				}
-				serialID, now, userLocation, err, testWaitingForDataReminder, badRequest := r.saveReminder(ctx, chatID, cleanText)
-				if now.IsZero() {
-					k.saveNote("<b>Напишите когда отправить напоминание</b>. Пример\nсегодня в 16:00, завтра в 9,\n" +
-						"через 10 минут, через 2 часа,\n5 февраля в 14:00, 12.03.2026 в 10\nЛибо вы можете сохранить как замтку")
-					session.State = "waiting_for_data_reminder"
-					setSession(chatID, session)
-					return
-				}
-				err = h.sendReminder(ctx, serialID, now, userLocation, msg, session, chatID)
-				if err != nil {
-					if strings.Contains(err.Error(), "start must not be in the past") {
-						msg.Text = "Время которе вы указали, уже прошло, введите только будущее время"
-						h.bot.Send(msg)
-						fmt.Println(chatID)
+				if isThere || !isMentioned {
+					serialID, now, userLocation, err, testWaitingForDataReminder, badRequest := r.saveReminder(ctx, chatID, cleanText)
+					if now.IsZero() {
+						k.saveNote("<b>Напишите когда отправить напоминание</b>. Пример\nсегодня в 16:00, завтра в 9,\n" +
+							"через 10 минут, через 2 часа,\n5 февраля в 14:00, 12.03.2026 в 10\nЛибо вы можете сохранить как замтку")
 						session.State = "waiting_for_data_reminder"
-						setSession(chatID, session)
-						fmt.Println(err)
-						cleanTextWithoutBadRequest := strings.Replace(cleanText, badRequest, "", -1)
-						cleanTextWithoutBadRequest = strings.TrimSpace(cleanTextWithoutBadRequest)
-						session.AlertMessage = fmt.Sprintf("@%s хочет вам напомнить %s", username, cleanTextWithoutBadRequest)
 						setSession(chatID, session)
 						return
 					}
+					err = h.sendReminder(ctx, serialID, now, userLocation, msg, session, chatID)
+					if err != nil {
+						if strings.Contains(err.Error(), "start must not be in the past") {
+							msg.Text = "Время которе вы указали, уже прошло, введите только будущее время"
+							h.bot.Send(msg)
+							fmt.Println(chatID)
+							session.State = "waiting_for_data_reminder"
+							setSession(chatID, session)
+							fmt.Println(err)
+							cleanTextWithoutBadRequest := strings.Replace(cleanText, badRequest, "", -1)
+							cleanTextWithoutBadRequest = strings.TrimSpace(cleanTextWithoutBadRequest)
+							session.AlertMessage = fmt.Sprintf("@%s хочет вам напомнить %s", username, cleanTextWithoutBadRequest)
+							setSession(chatID, session)
+							return
+						}
+					}
+					if !testWaitingForDataReminder {
+						k.saveNote("<b>Напишите когда отправить напоминание</b>. Пример\nсегодня в 16:00, завтра в 9,\n" +
+							"через 10 минут, через 2 часа,\n5 февраля в 14:00, 12.03.2026 в 10")
+						session.State = "waiting_for_data_reminder"
+						setSession(chatID, session)
+						return
+					}
+					k.openMainMenu("Напомнинание успешно сохранено!")
 				}
-				if !testWaitingForDataReminder {
-					k.saveNote("<b>Напишите когда отправить напоминание</b>. Пример\nсегодня в 16:00, завтра в 9,\n" +
-						"через 10 минут, через 2 часа,\n5 февраля в 14:00, 12.03.2026 в 10")
-					session.State = "waiting_for_data_reminder"
-					setSession(chatID, session)
-					return
-				}
-							k.openMainMenu("Напомнинание успешно сохранено!")
 				if isMentioned {
-				for i := range session.GlobalMentionUserIDs {
-
-				msgToFriend := tgbotapi.NewMessage(session.GlobalMentionUserIDs[i], session.AlertMessage)
-				friendSession := getSession(session.GlobalMentionUserIDs[i])
-				friendSession.AlertMessage = session.AlertMessage
-				setSession(session.GlobalMentionUserIDs[i], friendSession)
-				keyboard := k.friendReminderKeybard()
-				msgToFriend.ReplyMarkup = &keyboard
-				h.bot.Send(msgToFriend)
-			}
-		}
+					for i := range session.GlobalMentionUserIDs {
+						msgToFriend := tgbotapi.NewMessage(session.GlobalMentionUserIDs[i], session.AlertMessage)
+						friendSession := getSession(session.GlobalMentionUserIDs[i])
+						friendSession.AlertMessage = session.AlertMessage
+						setSession(session.GlobalMentionUserIDs[i], friendSession)
+						keyboard := k.friendReminderKeybard()
+						msgToFriend.ReplyMarkup = &keyboard
+						h.bot.Send(msgToFriend)
+					}
+				}
 				keyboard, text := k.inlineMenu()
 				msg.Text = text
 				msg.ReplyMarkup = keyboard
@@ -450,7 +452,6 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 					setSession(chatID, session)
 					session.DataForStatus = ""
 					setSession(chatID, session)
-					k.openMainMenu("Напоминание успешно сохранено")
 				}
 				if userText == "Сохранить как заметку" {
 					k.openMainMenu("Сохранено как заметку")
@@ -459,7 +460,7 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 					msg.ReplyMarkup = keyboard
 					h.bot.Send(msg)
 					session.State = ""
-				  setSession(chatID, session)
+					setSession(chatID, session)
 					return
 				}
 				serialID, now, userLocation, err := r.timeReminder(ctx, chatID, userText)
@@ -496,25 +497,25 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 				}
 				k.openMainMenu("Напоминание сохранено")
 				formatted := fmt.Sprintf("%s, %d %s %d в %02d:%02d",
-			mytime.Weekdays[now.Weekday()],
-			now.Day(),
-			mytime.Months[now.Month()],
-			now.Year(),
-			now.Hour(),
-			now.Minute(),
-		)
+					mytime.Weekdays[now.Weekday()],
+					now.Day(),
+					mytime.Months[now.Month()],
+					now.Year(),
+					now.Hour(),
+					now.Minute(),
+				)
 				session.AlertMessage += " " + formatted
 				setSession(chatID, session)
-				for i := range session.GlobalMentionUserIDs{
-				msgToFriend := tgbotapi.NewMessage(session.GlobalMentionUserIDs[i], session.AlertMessage)
-				msgToFriend.ParseMode = ""
-				friendSession := getSession(session.GlobalMentionUserIDs[i])
-				friendSession.AlertMessage = session.AlertMessage
-				fmt.Println("session1:" + friendSession.AlertMessage)
-				setSession(session.GlobalMentionUserIDs[i], friendSession)
-				keyboard := k.friendReminderKeybard()
-				msgToFriend.ReplyMarkup = &keyboard
-				h.bot.Send(msgToFriend)
+				for i := range session.GlobalMentionUserIDs {
+					msgToFriend := tgbotapi.NewMessage(session.GlobalMentionUserIDs[i], session.AlertMessage)
+					msgToFriend.ParseMode = ""
+					friendSession := getSession(session.GlobalMentionUserIDs[i])
+					friendSession.AlertMessage = session.AlertMessage
+					fmt.Println("session1:" + friendSession.AlertMessage)
+					setSession(session.GlobalMentionUserIDs[i], friendSession)
+					keyboard := k.friendReminderKeybard()
+					msgToFriend.ReplyMarkup = &keyboard
+					h.bot.Send(msgToFriend)
 				}
 				session.State = ""
 				setSession(chatID, session)
@@ -586,7 +587,7 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 	}
 }
 
-func (h *handler) sendReminder(ctx context.Context, serialID int64, sendTime time.Time, timezone string, msg tgbotapi.MessageConfig,session UserSession, chatID int64) error {
+func (h *handler) sendReminder(ctx context.Context, serialID int64, sendTime time.Time, timezone string, msg tgbotapi.MessageConfig, session UserSession, chatID int64) error {
 	k := newKeyboard(h.bot, msg.ChatID)
 	s, err := gocron.NewScheduler()
 	if err != nil {
@@ -607,18 +608,18 @@ func (h *handler) sendReminder(ctx context.Context, serialID int64, sendTime tim
 		return err
 
 	}
-			re := regexp.MustCompile(`@\w+`)
-		re1 := regexp.MustCompile(`хочет вам напомнить`)
-		mention := re.FindAllString(m, -1)
-		withoutMentionText := re.ReplaceAllString(m, "")
-		//re1.FindAllString(withoutMentionText, -1)
-		var cleanText string
-		if len(mention) > 0 {
-			cleanText = re1.ReplaceAllString(withoutMentionText, "") +" от " + mention[0]
-} else {
-	cleanText = re1.ReplaceAllString(withoutMentionText, "")
-}
-		cleanText = strings.TrimSpace(cleanText)
+	re := regexp.MustCompile(`@\w+`)
+	re1 := regexp.MustCompile(`хочет вам напомнить`)
+	mention := re.FindAllString(m, -1)
+	withoutMentionText := re.ReplaceAllString(m, "")
+	//re1.FindAllString(withoutMentionText, -1)
+	var cleanText string
+	if len(mention) > 0 {
+		cleanText = re1.ReplaceAllString(withoutMentionText, "") + " от " + mention[0]
+	} else {
+		cleanText = re1.ReplaceAllString(withoutMentionText, "")
+	}
+	cleanText = strings.TrimSpace(cleanText)
 	var check string
 	var result int
 	checkTime := time.Date(sendTime.Year(), sendTime.Month(), sendTime.Day(), sendTime.Hour(), sendTime.Minute(), sendTime.Second(), 0, loc)
@@ -640,7 +641,7 @@ func (h *handler) sendReminder(ctx context.Context, serialID int64, sendTime tim
 				setSession(chatID, session)
 			}
 
-		s.Shutdown()
+			s.Shutdown()
 		}),
 	)
 	if err != nil {
@@ -656,7 +657,7 @@ func (h *handler) backToReminders(ctx context.Context, cb *tgbotapi.CallbackQuer
 	if err != nil {
 		log.Println(err)
 	}
-	text, keyboard := k.remindersMenu(allReminders,0)
+	text, keyboard := k.remindersMenu(allReminders, 0)
 	edit := tgbotapi.NewEditMessageText(
 		cb.Message.Chat.ID,
 		cb.Message.MessageID,
