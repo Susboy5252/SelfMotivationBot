@@ -6,8 +6,8 @@ import (
 
 
 var (
-	userStates = make(map[int64]string)
-	statesMutex = &sync.RWMutex{}
+	//userStates = make(map[int64]string)
+	//statesMutex = &sync.RWMutex{}
 	sessions = make(map[int64]UserSession)
 	sessionsMutex = &sync.RWMutex{}
 )
@@ -16,7 +16,6 @@ type UserSession struct {
 	State               string
 	AlertMessage        string
 	GlobalMentionUserIDs []int64
-	RemindAgainText     string
 	DataForStatus       string
 }
 

@@ -248,16 +248,16 @@ func (k *keyboard) remindAgain(text string) {
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData(
-				"полчаса", "in_halfhour"),
+				"полчаса", fmt.Sprintf("in_halfhour_%s", text)),
 			tgbotapi.NewInlineKeyboardButtonData(
-				"час", "in_hour"),
+				"час", fmt.Sprintf("in_hour_%s", text)),
 			tgbotapi.NewInlineKeyboardButtonData(
-				"3 часа", "in_3hours"),
+				"3 часа", fmt.Sprintf("in_3hours_%s", text)),
 			tgbotapi.NewInlineKeyboardButtonData(
-				"завтра", "tomorrow"),
+				"завтра", fmt.Sprintf("tomorrow_%s", text)),
 		),
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("Свое время", "own_time"),
+			tgbotapi.NewInlineKeyboardButtonData("Свое время", fmt.Sprintf("own_time_%s", text)),
 		),
 		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData("⬅️ Вернуться в меню", "go_to_menu"),
@@ -268,11 +268,11 @@ func (k *keyboard) remindAgain(text string) {
 	k.bot.Send(msg)
 }
 
-func (k *keyboard) friendReminderKeybard() tgbotapi.InlineKeyboardMarkup {
+func (k *keyboard) friendReminderKeybard(friendsMessage string) tgbotapi.InlineKeyboardMarkup {
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData(
-				"Прийнять", "acept_remind"),
+				"Прийнять",fmt.Sprintf("acept_remind_%s", friendsMessage)),
 			tgbotapi.NewInlineKeyboardButtonData(
 				"Отклонить и вернутся", "go_to_menu"),
 		),
