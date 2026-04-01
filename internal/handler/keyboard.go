@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"sync"
 	"time"
-
+	"hash/fnv"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -269,10 +269,16 @@ func (k *keyboard) remindAgain(text string) {
 }
 
 func (k *keyboard) friendReminderKeybard(friendsMessage string) tgbotapi.InlineKeyboardMarkup {
+
+	h := fnv.New64a()
+	h.Write([]byte(friendsMessage))
+	alertMessageMutex.Lock()
+	defer alertMessageMutex.Unlock()
+	alertMessage[int(h.Sum64() % 1_000_000_000)] = friendsMessage
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData(
-				"Прийнять",fmt.Sprintf("acept_remind_%s", friendsMessage)),
+				"Прийнять",fmt.Sprintf("acept_remind_%d", int(h.Sum64() % 1_000_000_000))),
 			tgbotapi.NewInlineKeyboardButtonData(
 				"Отклонить и вернутся", "go_to_menu"),
 		),

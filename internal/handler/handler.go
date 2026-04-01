@@ -222,8 +222,13 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 			return
 		}
 
-				if indexStr, ok := strings.CutPrefix(data, "acept_remind_"); ok {
-			serialID, now, userLocation, err, _, _ := r.saveReminder(ctx, cb.From.ID, indexStr)
+				if index, ok := strings.CutPrefix(data, "acept_remind_"); ok {
+					indexStr, err := strconv.Atoi(index)
+					if err != nil {
+						fmt.Println("Error acept_remind_%w", err)
+					}
+			messageToFriend := alertMessage[indexStr]
+			serialID, now, userLocation, err, _, _ := r.saveReminder(ctx, cb.From.ID, messageToFriend)
 			err = h.sendReminder(ctx, serialID, now, userLocation, msg, session, cb.From.ID)
 
 			if err != nil {

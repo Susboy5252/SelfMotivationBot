@@ -10,6 +10,8 @@ var (
 	//statesMutex = &sync.RWMutex{}
 	sessions = make(map[int64]UserSession)
 	sessionsMutex = &sync.RWMutex{}
+	alertMessage = make(map[int]string)
+	alertMessageMutex = &sync.RWMutex{}
 )
 
 type UserSession struct {
