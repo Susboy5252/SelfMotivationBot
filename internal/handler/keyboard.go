@@ -3,12 +3,14 @@ package handler
 import (
 	"context"
 	"fmt"
+	"hash/fnv"
 	"motivator/internal/mytime"
 	"motivator/models"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
-	"hash/fnv"
+
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -269,7 +271,9 @@ func (k *keyboard) remindAgain(text string) {
 }
 
 func (k *keyboard) friendReminderKeybard(friendsMessage string) tgbotapi.InlineKeyboardMarkup {
-
+	if strings.Contains(friendsMessage, "Заметка") {
+	friendsMessage = strings.ReplaceAll(friendsMessage, "Заметка", "")
+}
 	h := fnv.New64a()
 	h.Write([]byte(friendsMessage))
 	alertMessageMutex.Lock()

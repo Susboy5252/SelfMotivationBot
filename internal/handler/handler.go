@@ -469,6 +469,18 @@ func (h *handler) processUpdate(update tgbotapi.Update) {
 					h.bot.Send(msg)
 					session.State = ""
 					setSession(chatID, session)
+					session.AlertMessage += " Заметка"
+					for i := range session.GlobalMentionUserIDs {
+						msgToFriend := tgbotapi.NewMessage(session.GlobalMentionUserIDs[i], session.AlertMessage)
+						msgToFriend.ParseMode = ""
+						friendSession := getSession(session.GlobalMentionUserIDs[i])
+						friendSession.AlertMessage = session.AlertMessage
+						fmt.Println("session1:" + friendSession.AlertMessage)
+						setSession(session.GlobalMentionUserIDs[i], friendSession)
+						keyboard := k.friendReminderKeybard(friendSession.AlertMessage)
+						msgToFriend.ReplyMarkup = &keyboard
+						h.bot.Send(msgToFriend)
+				}
 					return
 				}
 				serialID, now, userLocation, err := r.timeReminder(ctx, chatID, userText)
