@@ -4,21 +4,20 @@ import (
 	"sync"
 )
 
-
 var (
-	//userStates = make(map[int64]string)
-	//statesMutex = &sync.RWMutex{}
-	sessions = make(map[int64]UserSession)
+	sessions      = make(map[int64]UserSession)
 	sessionsMutex = &sync.RWMutex{}
-	alertMessage = make(map[int]string)
+
+	alertMessage      = make(map[int]string)
 	alertMessageMutex = &sync.RWMutex{}
 )
 
+// UserSession holds per-user conversational context.
 type UserSession struct {
-	State               string
-	AlertMessage        string
+	State              string
+	AlertMessage       string
 	GlobalMentionUserIDs []int64
-	DataForStatus       string
+	DataForStatus      string
 }
 
 func getSession(chatID int64) UserSession {
@@ -27,7 +26,6 @@ func getSession(chatID int64) UserSession {
 	return sessions[chatID]
 }
 
-// Обновляем всю сессию
 func setSession(chatID int64, session UserSession) {
 	sessionsMutex.Lock()
 	defer sessionsMutex.Unlock()

@@ -11,68 +11,67 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-var(
+var (
 	ErrUserNotFound = errors.New("user not found")
 )
+
 type user struct {
 	db *pgxpool.Pool
 }
 
-func newUser (db *pgxpool.Pool) *user {
-	return &user {
+func newUser(db *pgxpool.Pool) *user {
+	return &user{
 		db: db,
 	}
 }
 
-	func (u *user) CreateUser(ctx context.Context, userID int64, username string) error {
-		_, err := u.db.Exec(ctx, "insert into users (id, username) values ($1, $2)", userID, username)
-
-		if err != nil {
-			return fmt.Errorf("Error Exec id or username %w", err)
-		}
-		_, err = u.db.Exec(ctx, "insert into reminders (id) values ($1)", userID)
-
-		if err != nil {
-			return fmt.Errorf("Error Exec id %w", err)
-		}
-
-
-return nil
+// CreateUser registers a new user. Uses ON CONFLICT to avoid duplicates.
+func (u *user) CreateUser(ctx context.Context, userID int64, username string) error {
+	_, err := u.db.Exec(ctx,
+		"INSERT INTO users (id, username) VALUES ($1, $2) ON CONFLICT (id) DO NOTHING",
+		userID, username,
+	)
+	if err != nil {
+		return fmt.Errorf("user.CreateUser: %w", err)
 	}
+	return nil
+}
 
-	func (u *user) GetUser(ctx context.Context, userID int64) (*models.User, error) {
-		user := models.User{}
+// GetUser retrieves a user by ID. Returns nil if not found.
+func (u *user) GetUser(ctx context.Context, userID int64) (*models.User, error) {
+	usr := models.User{}
 
-		row := u.db.QueryRow(ctx, "select id, username, city, timezone, created_at, updated_at from users where id=$1", userID)
-		err := row.Scan(&user.ID, &user.Username, &user.City, &user.TimeZone, &user.Created_At, &user.Updated_At)
+	row := u.db.QueryRow(ctx,
+		"SELECT id, username, city, timezone, created_at, updated_at FROM users WHERE id = $1", userID,
+	)
+	err := row.Scan(&usr.ID, &usr.Username, &usr.City, &usr.TimeZone, &usr.CreatedAt, &usr.UpdatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("user.GetUser: %w", err)
+	}
+	return &usr, nil
+}
+
+// ConfirmUser checks that all mentioned users exist in the bot.
+// Returns the ID of the last confirmed user, or the problematic mention and ErrUserNotFound.
+func (u *user) ConfirmUser(ctx context.Context, mentions []string) (int64, string, error) {
+	var id int64
+
+	for _, m := range mentions {
+		username := strings.TrimPrefix(m, "@")
+
+		err := u.db.QueryRow(ctx,
+			"SELECT id FROM users WHERE username = $1", username,
+		).Scan(&id)
+
 		if err != nil {
-			if user.ID == 0{
-				return nil, nil
+			if errors.Is(err, pgx.ErrNoRows) {
+				return 0, m, ErrUserNotFound
 			}
-			return nil, fmt.Errorf("Error row.Scan GetUser %w", err)
+			return 0, "", fmt.Errorf("user.ConfirmUser: %w", err)
 		}
-		return &user, nil
 	}
-
-	func (u *user) ConfirmUser(ctx context.Context, mentions []string) (int64, string, error) {
-		var usernames []string
- 		var id int64
-
-		for _, m := range mentions {
-    	username := strings.TrimPrefix(m, "@")
-   	  usernames = append(usernames, username)
-
-    err := u.db.QueryRow(context.Background(),
-        "SELECT id FROM users WHERE username = $1",
-        username,
-    ).Scan(&id)
-
-    if err != nil {
-        if errors.Is(err, pgx.ErrNoRows) {
-            return 0, m, ErrUserNotFound
-        }
-        return 0, "", fmt.Errorf("Error u.db.QueryRow %w", err)
-    }
-	}
-		return id, "", nil
-	}
+	return id, "", nil
+}

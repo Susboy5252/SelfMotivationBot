@@ -4,6 +4,7 @@ import (
 	"time"
 )
 
+// GeonamesResponse is the API response from GeoNames postalCodeLookup.
 type GeonamesResponse struct {
 	PostalCodes []struct {
 		Lng       float64 `json:"lng"`
@@ -12,22 +13,19 @@ type GeonamesResponse struct {
 	} `json:"postalCodes"`
 }
 
+// Coordinates holds latitude and longitude.
 type Coordinates struct {
 	Lng float64
 	Lat float64
 }
 
+// TimeRequest is the API response from GeoNames timezone endpoint.
 type TimeRequest struct {
 	TimezoneID string `json:"timezoneId"`
 	TimeNow    string `json:"time"`
 }
 
-/*type Time struct {
-		TimezoneID  string  `json:"timezoneId"`
-		TimeNow     string  `json:"time"`
-
-}*/
-
+// Weekdays maps Go's time.Weekday to Russian day names.
 var Weekdays = map[time.Weekday]string{
 	time.Sunday:    "Воскресенье",
 	time.Monday:    "Понедельник",
@@ -38,6 +36,7 @@ var Weekdays = map[time.Weekday]string{
 	time.Saturday:  "Суббота",
 }
 
+// Months maps Go's time.Month to Russian month names (genitive case).
 var Months = map[time.Month]string{
 	time.January:   "января",
 	time.February:  "февраля",

@@ -4,10 +4,11 @@ import (
 	"context"
 	"fmt"
 	"motivator/models"
+	"regexp"
+	"strings"
 	"sync"
 	"time"
-	"strings"
-	"regexp"
+
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/olebedev/when"
 	"github.com/olebedev/when/rules/ru"
@@ -24,154 +25,176 @@ func newReminder(db *pgxpool.Pool) *reminder {
 	}
 }
 
-func (r *reminder) deleteReminders(ctx context.Context,
-	serialID int64, userID int64) error {
-
-	_, err := r.db.Exec(ctx, "delete from reminders where id=$1 and user_id=$2", serialID, userID)
+// deleteReminders removes a reminder by serial ID and user ID.
+func (r *reminder) deleteReminders(ctx context.Context, serialID int64, userID int64) error {
+	_, err := r.db.Exec(ctx,
+		"DELETE FROM reminders WHERE id = $1 AND user_id = $2",
+		serialID, userID,
+	)
 	if err != nil {
-		return fmt.Errorf("Error Exec delete deleteReminders")
+		return fmt.Errorf("reminder.deleteReminders: %w", err)
 	}
 	return nil
 }
 
+// getReminders retrieves all reminders for a user, cleaning up mention formatting.
 func (r *reminder) getReminders(ctx context.Context, userID int64) ([]models.Reminders, error) {
 	var allReminders []models.Reminders
 
-	query := "Select id, content, remind_at, done from reminders where user_id=$1 ORDER BY id ASC"
-	rows, err := r.db.Query(ctx, query, userID)
+	rows, err := r.db.Query(ctx,
+		"SELECT id, content, remind_at, done FROM reminders WHERE user_id = $1 ORDER BY id ASC",
+		userID,
+	)
 	if err != nil {
-		return nil, fmt.Errorf("Error h.pool.Query countReminders %w", err)
+		return nil, fmt.Errorf("reminder.getReminders: %w", err)
 	}
 	defer rows.Close()
+
+	reMention := regexp.MustCompile(`@\w+`)
+	reWantsRemind := regexp.MustCompile(`хочет вам напомнить`)
+
 	for rows.Next() {
 		var rem models.Reminders
-		err := rows.Scan(&rem.Serial_id, &rem.Content, &rem.Time, &rem.Done)
-		if err != nil {
-			return nil, fmt.Errorf("Error rows.Scan getReminders %w", err)
+		if err := rows.Scan(&rem.SerialID, &rem.Content, &rem.Time, &rem.Done); err != nil {
+			return nil, fmt.Errorf("reminder.getReminders scan: %w", err)
 		}
-		re := regexp.MustCompile(`@\w+`)
-		re1 := regexp.MustCompile(`хочет вам напомнить`)
-		mention := re.FindAllString(rem.Content, -1)
-		withoutMentionText := re.ReplaceAllString(rem.Content, "")
-		re1.FindAllString(withoutMentionText, -1)
 
-		if len(mention) != 0 {
-		cleanText := re1.ReplaceAllString(withoutMentionText, "")
-		cleanText = strings.TrimSpace(cleanText)
-		if strings.Contains(cleanText, "от") {
-			cleanText += " " + mention[0]
-		} else {
-			cleanText += " от " + mention[0]
+		// Clean up mention formatting for display
+		mentions := reMention.FindAllString(rem.Content, -1)
+		if len(mentions) != 0 {
+			withoutMention := reMention.ReplaceAllString(rem.Content, "")
+			cleanText := reWantsRemind.ReplaceAllString(withoutMention, "")
+			cleanText = strings.TrimSpace(cleanText)
+			if !strings.Contains(cleanText, "от") {
+				cleanText += " от " + mentions[0]
+			} else {
+				cleanText += " " + mentions[0]
+			}
+			rem.Content = strings.TrimSpace(cleanText)
 		}
-		rem.Content = strings.TrimSpace(cleanText)
-	}	
+
 		allReminders = append(allReminders, rem)
-}
-	return allReminders, nil
-}
-
-func (r *reminder) saveReminder(ctx context.Context, userID int64, reminder string)  (int64, time.Time, string, error, bool, string) {
-	userLocation := ""
-	err := r.db.QueryRow(ctx, "select timezone from users where id=$1", userID).Scan(&userLocation)
-
-	    if err != nil {
-        return 0, time.Time{}, "", fmt.Errorf("failed to get user timezone: %w", err), false, ""
-    }
-
-		loc, err := time.LoadLocation(userLocation)
-	if err != nil {
-		return 0, time.Time{}, "", fmt.Errorf("Error time.LoadLocation writeReminder %w", err), false, ""
 	}
-	
+	return allReminders, rows.Err()
+}
+
+// saveReminder parses the text for a time expression, saves the reminder, and returns all relevant data.
+func (r *reminder) saveReminder(ctx context.Context, userID int64, reminderText string) (int64, time.Time, string, error, bool, string) {
+	userLocation := ""
+	err := r.db.QueryRow(ctx, "SELECT timezone FROM users WHERE id = $1", userID).Scan(&userLocation)
+	if err != nil {
+		return 0, time.Time{}, "", fmt.Errorf("reminder.saveReminder: failed to get user timezone: %w", err), false, ""
+	}
+
+	loc, err := time.LoadLocation(userLocation)
+	if err != nil {
+		return 0, time.Time{}, "", fmt.Errorf("reminder.saveReminder: invalid timezone: %w", err), false, ""
+	}
+
 	now := time.Now().In(loc)
 
 	w := when.New(nil)
-
 	w.Add(ru.All...)
 
-	result, err := w.Parse(reminder, now)
-
+	result, err := w.Parse(reminderText, now)
 	if err != nil {
-		return 0, time.Time{}, "", fmt.Errorf("Error w.Parse writeReminder %w", err), false, ""
+		return 0, time.Time{}, "", fmt.Errorf("reminder.saveReminder: time parsing failed: %w", err), false, ""
 	}
-	if result == nil {
-		    	var id int64
-			        err = r.db.QueryRow(ctx, "INSERT INTO reminders (content, user_id) VALUES ($1, $2) RETURNING id", reminder, userID).Scan(&id)
-							        if err != nil {
-            return 0, time.Time{}, "", fmt.Errorf("failed to insert reminder without time: %w", err), false, ""
-        }
 
+	// No time expression found -- save as a note
+	if result == nil {
+		var id int64
+		err = r.db.QueryRow(ctx,
+			"INSERT INTO reminders (content, user_id) VALUES ($1, $2) RETURNING id",
+			reminderText, userID,
+		).Scan(&id)
+		if err != nil {
+			return 0, time.Time{}, "", fmt.Errorf("reminder.saveReminder: failed to insert note: %w", err), false, ""
+		}
 		return id, time.Time{}, "", nil, false, ""
 	}
-    content := strings.Replace(reminder, result.Text, "", 1)
-    content = strings.TrimSpace(content)
-	if content == "" {
-		return 0, time.Time{}, "", fmt.Errorf("Error saveReminder empty reminder text %w", err), false, ""
-	}
-	var id int64
-	err = r.db.QueryRow(ctx, "insert into reminders (content, user_id, remind_at) values ($1, $2, $3) RETURNING id", content, userID, result.Time).Scan(&id)
 
+	// Extract content by removing the time expression
+	content := strings.Replace(reminderText, result.Text, "", 1)
+	content = strings.TrimSpace(content)
+	if content == "" {
+		return 0, time.Time{}, "", fmt.Errorf("reminder.saveReminder: текст напоминания пуст после удаления времени"), false, ""
+	}
+
+	var id int64
+	err = r.db.QueryRow(ctx,
+		"INSERT INTO reminders (content, user_id, remind_at) VALUES ($1, $2, $3) RETURNING id",
+		content, userID, result.Time,
+	).Scan(&id)
 	if err != nil {
-			return 0, time.Time{}, "", fmt.Errorf("Error saveReminder empty reminder text %w", err), false, ""
+		return 0, time.Time{}, "", fmt.Errorf("reminder.saveReminder: failed to insert reminder: %w", err), false, ""
 	}
 
 	return id, result.Time, userLocation, nil, true, result.Text
-
 }
 
-func (r *reminder) timeReminder(ctx context.Context, userID int64, remind_at string) (int64, time.Time, string, error) {
+// timeReminder parses a time expression and applies it to the latest reminder for a user.
+func (r *reminder) timeReminder(ctx context.Context, userID int64, remindAt string) (int64, time.Time, string, error) {
 	var serialID int64
-	err := r.db.QueryRow(ctx, "SELECT id FROM reminders WHERE user_id=$1 ORDER BY id DESC LIMIT 1", userID).Scan(&serialID)
+	err := r.db.QueryRow(ctx,
+		"SELECT id FROM reminders WHERE user_id = $1 ORDER BY id DESC LIMIT 1", userID,
+	).Scan(&serialID)
 	if err != nil {
-		return 0, time.Time{}, "", fmt.Errorf("напоминание не найдено: %w", err)
+		return 0, time.Time{}, "", fmt.Errorf("reminder.timeReminder: напоминание не найдено: %w", err)
 	}
 
 	var userLocation string
-	r.db.QueryRow(ctx, "select timezone from users where id=$1", userID).Scan(&userLocation)
-	
-	loc, _ := time.LoadLocation(userLocation)
+	if err := r.db.QueryRow(ctx, "SELECT timezone FROM users WHERE id = $1", userID).Scan(&userLocation); err != nil {
+		return 0, time.Time{}, "", fmt.Errorf("reminder.timeReminder: failed to get timezone: %w", err)
+	}
+
+	loc, err := time.LoadLocation(userLocation)
+	if err != nil {
+		return 0, time.Time{}, "", fmt.Errorf("reminder.timeReminder: invalid timezone: %w", err)
+	}
+
 	now := time.Now().In(loc)
 
 	w := when.New(nil)
 	w.Add(ru.All...)
-	result, err := w.Parse(remind_at, now)
-	
+	result, err := w.Parse(remindAt, now)
+
 	if err != nil || result == nil {
-		return 0, time.Time{}, "", fmt.Errorf("не удалось распознать время")
+		return 0, time.Time{}, "", fmt.Errorf("reminder.timeReminder: не удалось распознать время из %q", remindAt)
 	}
 
-	_, err = r.db.Exec(ctx, "update reminders set remind_at=$1 where id=$2", result.Time, serialID)
+	_, err = r.db.Exec(ctx, "UPDATE reminders SET remind_at = $1 WHERE id = $2", result.Time, serialID)
 	if err != nil {
-		return 0, time.Time{}, "", err
+		return 0, time.Time{}, "", fmt.Errorf("reminder.timeReminder: failed to update remind_at: %w", err)
 	}
 
 	return serialID, result.Time, userLocation, nil
 }
 
+// changeDone toggles the done status of a reminder with a single query.
 func (r *reminder) changeDone(ctx context.Context, serialID int64) error {
-		done := false
-		row := r.db.QueryRow(ctx, "select done from reminders where id=$1", serialID)
-		err := row.Scan(&done)
-		if err != nil {
-			return	fmt.Errorf("Error changeDone row.Scan %w", err)
-		}
-		_, err = r.db.Exec(ctx, "update reminders set done=$1 where id=$2", !done, serialID)
-		if err != nil {
-			return fmt.Errorf("Error changeDone r.db.Exec %w", err)
-		}
-		return nil
+	_, err := r.db.Exec(ctx,
+		"UPDATE reminders SET done = NOT done WHERE id = $1", serialID,
+	)
+	if err != nil {
+		return fmt.Errorf("reminder.changeDone: %w", err)
+	}
+	return nil
 }
 
-func (r *reminder) getFriendsReminder (ctx context.Context, mentionedUser []string) ([]int64, error) {
-	var mentionedUserID []int64
-	var localMention int64
-	for i := range mentionedUser {
-	err := r.db.QueryRow(ctx, "select id from users where username = $1", mentionedUser[i]).Scan(&localMention)
-	if err != nil {
-		fmt.Println(mentionedUser)
-		return []int64{}, fmt.Errorf("Errror getFriendsReminder row.Scan %w", err)
+// getFriendsReminder resolves usernames to user IDs.
+func (r *reminder) getFriendsReminder(ctx context.Context, mentionedUser []string) ([]int64, error) {
+	var mentionedUserIDs []int64
+
+	for _, username := range mentionedUser {
+		var userID int64
+		err := r.db.QueryRow(ctx,
+			"SELECT id FROM users WHERE username = $1", username,
+		).Scan(&userID)
+		if err != nil {
+			return nil, fmt.Errorf("reminder.getFriendsReminder: user %q not found: %w", username, err)
+		}
+		mentionedUserIDs = append(mentionedUserIDs, userID)
 	}
-	mentionedUserID = append(mentionedUserID, localMention)
-	}
-	return mentionedUserID, nil
+	return mentionedUserIDs, nil
 }

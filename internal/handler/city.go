@@ -11,27 +11,30 @@ type city struct {
 	db *pgxpool.Pool
 }
 
-func newCity (db *pgxpool.Pool) *city  {
-	return &city  {
+func newCity(db *pgxpool.Pool) *city {
+	return &city{
 		db: db,
 	}
 }
 
+// GetUserCity retrieves the stored city for a user.
 func (c *city) GetUserCity(ctx context.Context, userID int64) (string, error) {
-	var city string
-	row :=c.db.QueryRow(ctx, "select city from users where id=$1", userID)
-	err := row.Scan(&city)
-	if err != nil{
-		return "", fmt.Errorf("Error scan %w", err)
+	var cityName string
+	row := c.db.QueryRow(ctx, "SELECT city FROM users WHERE id = $1", userID)
+	if err := row.Scan(&cityName); err != nil {
+		return "", fmt.Errorf("city.GetUserCity: %w", err)
 	}
-	return city, nil
+	return cityName, nil
 }
 
-func (c *city) updateUserCity(ctx context.Context, userID int64, city string) error {
-	_, err := c.db.Exec(ctx, "update users set city=$1 where id=$2", city, userID)
+// updateUserCity updates the user's city and the updated_at timestamp.
+func (c *city) updateUserCity(ctx context.Context, userID int64, cityName string) error {
+	_, err := c.db.Exec(ctx,
+		"UPDATE users SET city = $1, updated_at = now() WHERE id = $2",
+		cityName, userID,
+	)
 	if err != nil {
-		return fmt.Errorf("Error city Exec %w", err)
+		return fmt.Errorf("city.updateUserCity: %w", err)
 	}
 	return nil
 }
-
