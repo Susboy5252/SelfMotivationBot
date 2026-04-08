@@ -4,10 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"hash/fnv"
 	"log"
 	"motivator/internal/bot/keyboard"
 	"motivator/internal/bot/session"
+	"motivator/internal/models"
 	"motivator/internal/service"
 	"regexp"
 	"strings"
@@ -105,6 +105,12 @@ func (h *Handler) onReminderInput(ctx context.Context, chatID int64, username, t
 	hasMentions := len(mentions) > 0
 	mentionsIncludeSelf := false
 
+	// Validate: text must not be empty (even with mentions)
+	if cleanText == "" {
+		h.send(chatID, "Текст напоминания не может быть пустым. Напишите что нужно напомнить, например:\n<code>купить молоко @друг завтра в 10</code>")
+		return
+	}
+
 	// Resolve mentioned users
 	var friendIDs []int64
 	if hasMentions {
@@ -126,7 +132,7 @@ func (h *Handler) onReminderInput(ctx context.Context, chatID int64, username, t
 			friendIDs = append(friendIDs, u.ID)
 		}
 		sess.MentionedIDs = friendIDs
-		sess.AlertMessage = fmt.Sprintf("@%s хочет вам напомнить %s", username, cleanText)
+		sess.SenderUsername = username
 	}
 
 	// Save for the current user if self-mentioned or no mentions
@@ -146,6 +152,7 @@ func (h *Handler) onReminderInput(ctx context.Context, chatID int64, username, t
 				keyboard.SaveAsNote(),
 			)
 			sess.State = session.StateWaitingForTime
+			sess.PendingReminderID = parsed.ID
 			h.sessions.Set(chatID, sess)
 			return
 		}
@@ -155,18 +162,52 @@ func (h *Handler) onReminderInput(ctx context.Context, chatID int64, username, t
 			if strings.Contains(err.Error(), "start must not be in the past") {
 				h.send(chatID, "Время которое вы указали уже прошло. Введите будущее время.")
 				sess.State = session.StateWaitingForTime
+				sess.PendingReminderID = parsed.ID
 				h.sessions.Set(chatID, sess)
 				return
 			}
 			log.Printf("handler: schedule failed: %v", err)
 		}
 
+		sess.PendingReminderID = parsed.ID
 		h.sendWithReplyKeyboard(chatID, "Напоминание успешно сохранено!", keyboard.OpenMainMenuButton())
 	}
 
-	// Send to mentioned friends
-	if hasMentions {
-		h.sendFriendReminders(chatID, sess)
+	// Send to mentioned friends using reminder_recipients
+	if hasMentions && len(friendIDs) > 0 {
+		// If no reminder was saved yet for self (only sending to friends),
+		// save the reminder under the sender's name
+		if sess.PendingReminderID == 0 {
+			parsed, err := h.reminders.ParseAndSave(ctx, chatID, cleanText)
+			if err != nil {
+				log.Printf("handler: save reminder for friends failed: %v", err)
+				h.send(chatID, "Произошла ошибка при сохранении. Попробуйте ещё раз.")
+				h.sessions.Clear(chatID)
+				return
+			}
+
+			if !parsed.HasTime {
+				// No time -- ask for time or save as note, then send to friends
+				h.sendWithReplyKeyboard(chatID,
+					"<b>Напишите когда отправить напоминание</b>. Пример:\nсегодня в 16:00, завтра в 9\nчерез 10 минут, через 2 часа\n5 февраля в 14:00, 12.03.2026 в 10\n\nЛибо вы можете сохранить как заметку.",
+					keyboard.SaveAsNote(),
+				)
+				sess.State = session.StateWaitingForTime
+				sess.PendingReminderID = parsed.ID
+				h.sessions.Set(chatID, sess)
+				return
+			}
+
+			sess.PendingReminderID = parsed.ID
+
+			// Schedule for the creator
+			if err := h.scheduler.Schedule(ctx, parsed.ID, parsed.RemindAt, parsed.Location); err != nil {
+				log.Printf("handler: schedule for creator failed: %v", err)
+			}
+		}
+
+		h.sendFriendReminders(ctx, chatID, sess)
+		h.sendWithReplyKeyboard(chatID, "Напоминание отправлено друзьям!", keyboard.OpenMainMenuButton())
 	}
 
 	// Show main menu
@@ -181,10 +222,9 @@ func (h *Handler) onTimeInput(ctx context.Context, chatID int64, text string, se
 	if text == "Сохранить как заметку" {
 		h.sendWithReplyKeyboard(chatID, "Сохранено как заметку", keyboard.OpenMainMenuButton())
 
-		// Send to friends if there are mentions
+		// Send to friends if there are mentions (as a note)
 		if len(sess.MentionedIDs) > 0 {
-			sess.AlertMessage += " Заметка"
-			h.sendFriendReminders(chatID, sess)
+			h.sendFriendReminders(ctx, chatID, sess)
 		}
 
 		kb, menuText := keyboard.MainMenu()
@@ -198,7 +238,7 @@ func (h *Handler) onTimeInput(ctx context.Context, chatID int64, text string, se
 	if err != nil {
 		log.Printf("handler: set time failed: %v", err)
 		h.sendWithReplyKeyboard(chatID,
-			"<b>Напишите когда отправить напоминание</b>. Пример:\nсегодня в 16:00, завтра в 9\nчерез 10 минут, через 2 часа\n5 февраля в 14:00, 12.03.2026 в 10\n\nЛибо вы можете сохранить как заметку.",
+			"<b>Не удалось распознать время.</b> Попробуйте ещё раз. Пример:\nсегодня в 16:00, завтра в 9\nчерез 10 минут, через 2 часа\n5 февраля в 14:00, 12.03.2026 в 10\n\nЛибо вы можете сохранить как заметку.",
 			keyboard.SaveAsNote(),
 		)
 		return
@@ -219,9 +259,7 @@ func (h *Handler) onTimeInput(ctx context.Context, chatID int64, text string, se
 
 	// Send to friends if applicable
 	if len(sess.MentionedIDs) > 0 {
-		formatted := service.FormatDateTimeRu(parsed.RemindAt)
-		sess.AlertMessage += " " + formatted
-		h.sendFriendReminders(chatID, sess)
+		h.sendFriendReminders(ctx, chatID, sess)
 	}
 
 	kb, menuText := keyboard.MainMenu()
@@ -242,28 +280,46 @@ func (h *Handler) onPlanInput(ctx context.Context, chatID int64, text string) {
 	h.sessions.Clear(chatID)
 }
 
-// sendFriendReminders sends the alert message to all mentioned friends.
-func (h *Handler) sendFriendReminders(senderChatID int64, sess session.Session) {
-	hash := hashMessage(sess.AlertMessage)
+// sendFriendReminders adds recipients to the reminder and notifies them.
+func (h *Handler) sendFriendReminders(ctx context.Context, senderChatID int64, sess session.Session) {
+	if sess.PendingReminderID == 0 {
+		log.Printf("handler: no pending reminder ID for friend reminders")
+		return
+	}
 
-	h.alertMu.Lock()
-	h.alertMessages[hash] = sess.AlertMessage
-	h.alertMu.Unlock()
+	// Get the reminder to build the notification text
+	rem, err := h.reminders.GetByID(ctx, sess.PendingReminderID)
+	if err != nil || rem == nil {
+		log.Printf("handler: pending reminder %d not found: %v", sess.PendingReminderID, err)
+		return
+	}
 
-	kb := keyboard.FriendReminder(hash)
+	// Build display text: "TEXT от @username" (optionally with date)
+	displayText := rem.Content + " от @" + sess.SenderUsername
+	if rem.RemindAt != nil && !rem.RemindAt.IsZero() {
+		displayText += " " + service.FormatDateTimeRu(*rem.RemindAt)
+	}
+
+	kb := keyboard.FriendReminder(rem.ID)
 
 	for _, friendID := range sess.MentionedIDs {
-		msg := tgbotapi.NewMessage(friendID, sess.AlertMessage)
+		// Add recipient record in the database
+		rec := &models.ReminderRecipient{
+			ReminderID: rem.ID,
+			UserID:     friendID,
+			SenderID:   senderChatID,
+			Status:     "pending",
+		}
+		if err := h.reminders.AddRecipient(ctx, rec); err != nil {
+			log.Printf("handler: failed to add recipient %d: %v", friendID, err)
+			continue
+		}
+
+		// Send notification to friend
+		msg := tgbotapi.NewMessage(friendID, displayText)
 		msg.ReplyMarkup = kb
 		if _, err := h.bot.Send(msg); err != nil {
 			log.Printf("handler: failed to send friend reminder to %d: %v", friendID, err)
 		}
 	}
-}
-
-// hashMessage creates a deterministic hash for a message string.
-func hashMessage(s string) int {
-	h := fnv.New64a()
-	h.Write([]byte(s))
-	return int(h.Sum64() % 1_000_000_000)
 }

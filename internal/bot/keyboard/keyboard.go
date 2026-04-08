@@ -99,6 +99,8 @@ func RemoveKeyboard() tgbotapi.ReplyKeyboardRemove {
 }
 
 // RemindersList builds a paginated list of reminders with navigation buttons.
+// Display format: "TEXT от @username DATE STATUS" for friend reminders,
+// or "TEXT DATE STATUS" for own reminders.
 func RemindersList(reminders []models.Reminder, page int) (string, tgbotapi.InlineKeyboardMarkup) {
 	if len(reminders) == 0 {
 		kb := tgbotapi.NewInlineKeyboardMarkup(
@@ -106,7 +108,7 @@ func RemindersList(reminders []models.Reminder, page int) (string, tgbotapi.Inli
 				tgbotapi.NewInlineKeyboardButtonData("⬅️ Вернуться", "go_to_menu"),
 			),
 		)
-		return "У вас еще нет напоминаний, нажмите \"Добавить напоминание\"", kb
+		return "У вас ещё нет напоминаний, нажмите \"Добавить напоминание\"", kb
 	}
 
 	start := page
@@ -127,7 +129,14 @@ func RemindersList(reminders []models.Reminder, page int) (string, tgbotapi.Inli
 		if rem.Done {
 			status = "✅"
 		}
-		text += fmt.Sprintf("%d %s %s %s\n", num, rem.Content, timeStr, status)
+
+		// Format: "1. TEXT от @username | DATE STATUS" or "1. TEXT | DATE STATUS"
+		if rem.SenderUsername != "" {
+			text += fmt.Sprintf("%d. %s от @%s | %s %s\n", num, rem.Content, rem.SenderUsername, timeStr, status)
+		} else {
+			text += fmt.Sprintf("%d. %s | %s %s\n", num, rem.Content, timeStr, status)
+		}
+
 		buttons[i] = tgbotapi.NewInlineKeyboardButtonData(
 			strconv.Itoa(num),
 			fmt.Sprintf("remindme_%d", rem.ID),
@@ -160,6 +169,9 @@ func RemindersList(reminders []models.Reminder, page int) (string, tgbotapi.Inli
 // ReminderDetail builds the detail view for a single reminder.
 func ReminderDetail(rem *models.Reminder) (string, tgbotapi.InlineKeyboardMarkup) {
 	text := rem.Content
+	if rem.SenderUsername != "" {
+		text += " от @" + rem.SenderUsername
+	}
 
 	var actionRow []tgbotapi.InlineKeyboardButton
 	actionRow = append(actionRow,
@@ -193,7 +205,7 @@ func ReminderDetail(rem *models.Reminder) (string, tgbotapi.InlineKeyboardMarkup
 
 // RemindAgain builds a keyboard with quick reschedule options.
 func RemindAgain(content string) (string, tgbotapi.InlineKeyboardMarkup) {
-	text := content + "\nНапомнить еще раз через:"
+	text := content + "\nНапомнить ещё раз через:"
 	kb := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData("полчаса", "in_halfhour_"+content),
@@ -202,7 +214,7 @@ func RemindAgain(content string) (string, tgbotapi.InlineKeyboardMarkup) {
 			tgbotapi.NewInlineKeyboardButtonData("завтра", "tomorrow_"+content),
 		),
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("Свое время", "own_time_"+content),
+			tgbotapi.NewInlineKeyboardButtonData("Своё время", "own_time_"+content),
 		),
 		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData("⬅️ Вернуться в меню", "go_to_menu"),
@@ -212,11 +224,12 @@ func RemindAgain(content string) (string, tgbotapi.InlineKeyboardMarkup) {
 }
 
 // FriendReminder builds a keyboard for accepting/declining a friend's reminder.
-func FriendReminder(messageHash int) tgbotapi.InlineKeyboardMarkup {
+// reminderID is the database ID of the reminder to accept.
+func FriendReminder(reminderID int64) tgbotapi.InlineKeyboardMarkup {
 	return tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("Принять", fmt.Sprintf("accept_remind_%d", messageHash)),
-			tgbotapi.NewInlineKeyboardButtonData("Отклонить", "go_to_menu"),
+			tgbotapi.NewInlineKeyboardButtonData("Принять", fmt.Sprintf("accept_remind_%d", reminderID)),
+			tgbotapi.NewInlineKeyboardButtonData("Отклонить", fmt.Sprintf("decline_remind_%d", reminderID)),
 		),
 	)
 }

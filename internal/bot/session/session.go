@@ -6,20 +6,24 @@ import "sync"
 type State string
 
 const (
-	StateNone                State = ""
-	StateWaitingForCity      State = "waiting_for_city"
-	StateWaitingForReminder  State = "waiting_for_reminder"
-	StateWaitingForTime      State = "waiting_for_data_reminder"
-	StateWaitingForPlan      State = "waiting_for_plan"
-	StateWaitingForOwnTime   State = "waiting_for_own_time"
+	StateNone               State = ""
+	StateWaitingForCity     State = "waiting_for_city"
+	StateWaitingForReminder State = "waiting_for_reminder"
+	StateWaitingForTime     State = "waiting_for_data_reminder"
+	StateWaitingForPlan     State = "waiting_for_plan"
+	StateWaitingForOwnTime  State = "waiting_for_own_time"
 )
 
 // Session holds per-user conversational context.
 type Session struct {
-	State           State
-	AlertMessage    string
-	MentionedIDs    []int64
-	PendingContent  string // content waiting for a time to be set
+	State          State
+	MentionedIDs   []int64
+	PendingContent string // content waiting for a time to be set
+	SenderUsername string // username of the sender (for friend reminders)
+
+	// FriendReminder stores the reminder ID that was sent to friends
+	// so we can add recipients and schedule for them when they accept.
+	PendingReminderID int64
 }
 
 // Manager is a thread-safe in-memory session store.

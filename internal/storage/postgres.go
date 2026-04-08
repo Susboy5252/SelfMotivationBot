@@ -19,11 +19,23 @@ var migrations = []string{
 		updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 	)`,
 	`CREATE TABLE IF NOT EXISTS reminders (
-		id        BIGSERIAL PRIMARY KEY,
-		user_id   BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-		content   TEXT NOT NULL DEFAULT '',
-		remind_at TIMESTAMPTZ,
-		done      BOOLEAN NOT NULL DEFAULT false
+		id         BIGSERIAL PRIMARY KEY,
+		creator_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		content    TEXT NOT NULL DEFAULT '',
+		remind_at  TIMESTAMPTZ,
+		done       BOOLEAN NOT NULL DEFAULT false,
+		created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+		updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+	)`,
+	`CREATE TABLE IF NOT EXISTS reminder_recipients (
+		id          BIGSERIAL PRIMARY KEY,
+		reminder_id BIGINT NOT NULL REFERENCES reminders(id) ON DELETE CASCADE,
+		user_id     BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		sender_id   BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+		status      TEXT NOT NULL DEFAULT 'pending',
+		done        BOOLEAN NOT NULL DEFAULT false,
+		created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+		UNIQUE(reminder_id, user_id)
 	)`,
 	`CREATE TABLE IF NOT EXISTS plans (
 		id         BIGSERIAL PRIMARY KEY,

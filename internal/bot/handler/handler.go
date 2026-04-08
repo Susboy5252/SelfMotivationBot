@@ -7,23 +7,18 @@ import (
 	"motivator/internal/bot/session"
 	"motivator/internal/scheduler"
 	"motivator/internal/service"
-	"sync"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 // Handler dispatches Telegram updates to the appropriate handler method.
 type Handler struct {
-	bot         *tgbotapi.BotAPI
-	users       *service.UserService
-	reminders   *service.ReminderService
-	plans       *service.PlanService
-	sessions    *session.Manager
-	scheduler   *scheduler.Scheduler
-
-	// alertMessages stores friend reminder messages by hash for acceptance.
-	alertMu       sync.RWMutex
-	alertMessages map[int]string
+	bot       *tgbotapi.BotAPI
+	users     *service.UserService
+	reminders *service.ReminderService
+	plans     *service.PlanService
+	sessions  *session.Manager
+	scheduler *scheduler.Scheduler
 }
 
 // New creates a Handler with all required dependencies.
@@ -36,13 +31,12 @@ func New(
 	sched *scheduler.Scheduler,
 ) *Handler {
 	return &Handler{
-		bot:           bot,
-		users:         users,
-		reminders:     reminders,
-		plans:         plans,
-		sessions:      sessions,
-		scheduler:     sched,
-		alertMessages: make(map[int]string),
+		bot:       bot,
+		users:     users,
+		reminders: reminders,
+		plans:     plans,
+		sessions:  sessions,
+		scheduler: sched,
 	}
 }
 
@@ -60,7 +54,6 @@ func (h *Handler) HandleUpdate(update tgbotapi.Update) {
 
 // OnReminderFired is called by the scheduler when a reminder's time arrives.
 func (h *Handler) OnReminderFired(reminderID int64, content string) {
-	// Look up which user owns this reminder to send them the notification
 	ctx := context.Background()
 	rem, err := h.reminders.GetByID(ctx, reminderID)
 	if err != nil || rem == nil {
@@ -69,7 +62,7 @@ func (h *Handler) OnReminderFired(reminderID int64, content string) {
 	}
 
 	text, kb := keyboard.RemindAgain(content)
-	msg := tgbotapi.NewMessage(rem.UserID, text)
+	msg := tgbotapi.NewMessage(rem.CreatorID, text)
 	msg.ReplyMarkup = kb
 	if _, err := h.bot.Send(msg); err != nil {
 		log.Printf("handler: failed to send reminder notification: %v", err)

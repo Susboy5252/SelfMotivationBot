@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"motivator/internal/repository"
-	"strings"
 	"time"
 
 	"github.com/go-co-op/gocron/v2"
@@ -62,9 +61,7 @@ func (s *Scheduler) Schedule(ctx context.Context, reminderID int64, sendTime tim
 				return
 			}
 
-			// Clean up mention formatting for display
-			content := cleanMentionText(rem.Content)
-			s.notify(reminderID, content)
+			s.notify(reminderID, rem.Content)
 		}),
 	)
 	if err != nil {
@@ -73,20 +70,4 @@ func (s *Scheduler) Schedule(ctx context.Context, reminderID int64, sendTime tim
 
 	sched.Start()
 	return nil
-}
-
-// cleanMentionText removes the "wants to remind you" pattern and reformats mentions.
-func cleanMentionText(text string) string {
-	// If the text contains a mention pattern like "@user хочет вам напомнить ...",
-	// extract just the content and attribute it.
-	if idx := strings.Index(text, "хочет вам напомнить"); idx != -1 {
-		parts := strings.SplitN(text, "хочет вам напомнить", 2)
-		mention := strings.TrimSpace(parts[0])
-		content := strings.TrimSpace(parts[1])
-		if content == "" {
-			return mention
-		}
-		return content + " от " + mention
-	}
-	return text
 }

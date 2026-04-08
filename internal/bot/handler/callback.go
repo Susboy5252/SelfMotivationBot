@@ -49,7 +49,9 @@ func (h *Handler) handleCallback(update tgbotapi.Update) {
 	case strings.HasPrefix(data, "own_time_"):
 		h.onOwnTime(ctx, cb, data, sess)
 	case strings.HasPrefix(data, "accept_remind_"):
-		h.onAcceptFriendReminder(ctx, cb, edit, data, sess)
+		h.onAcceptFriendReminder(ctx, cb, edit, data)
+	case strings.HasPrefix(data, "decline_remind_"):
+		h.onDeclineFriendReminder(ctx, cb, edit, data)
 	default:
 		h.handleCallbackAction(ctx, cb, edit, data, sess, update)
 	}
@@ -105,7 +107,7 @@ func (h *Handler) handleCallbackAction(ctx context.Context, cb *tgbotapi.Callbac
 		} else if update.SentFrom() != nil {
 			username = update.SentFrom().FirstName
 		}
-		edit.Text = fmt.Sprintf("О чем тебе напомнить? Напиши текст напоминания.\n\nМожно делать совместные напоминания, отмечая знакомых. Например:\nзабрать посылку @SelfMotivationBot\nВыучить программирование @SelfMotivationBot %s\n\nПользователь должен быть зарегистрирован в боте.", username)
+		edit.Text = fmt.Sprintf("О чём тебе напомнить? Напиши текст напоминания.\n\nМожно делать совместные напоминания, отмечая знакомых. Например:\nзабрать посылку завтра @друг\nВыучить программирование через 2 часа %s\n\nПользователь должен быть зарегистрирован в боте.", username)
 		h.bot.Send(edit)
 		h.sessions.SetState(chatID, session.StateWaitingForReminder)
 
@@ -226,7 +228,7 @@ func (h *Handler) onToggleDone(ctx context.Context, cb *tgbotapi.CallbackQuery, 
 		return
 	}
 
-	alert := tgbotapi.NewCallback(cb.ID, "Статус изменен")
+	alert := tgbotapi.NewCallback(cb.ID, "Статус изменён")
 	h.bot.Request(alert)
 
 	rem, err := h.reminders.GetByID(ctx, id)
@@ -269,7 +271,7 @@ func (h *Handler) onOwnTime(ctx context.Context, cb *tgbotapi.CallbackQuery, dat
 	chatID := cb.Message.Chat.ID
 
 	// Save as note first, then wait for time input
-	_, err := h.reminders.SaveNote(ctx, chatID, content)
+	id, err := h.reminders.SaveNote(ctx, chatID, content)
 	if err != nil {
 		log.Printf("handler: save note for own_time failed: %v", err)
 	}
@@ -277,41 +279,58 @@ func (h *Handler) onOwnTime(ctx context.Context, cb *tgbotapi.CallbackQuery, dat
 	h.send(chatID, "<b>Напишите когда отправить напоминание</b>. Пример:\nсегодня в 16:00, завтра в 9\nчерез 10 минут, через 2 часа\n5 февраля в 14:00, 12.03.2026 в 10")
 
 	sess.State = session.StateWaitingForOwnTime
+	sess.PendingReminderID = id
 	h.sessions.Set(cb.From.ID, sess)
 }
 
 // onAcceptFriendReminder handles accepting a reminder from a friend.
-func (h *Handler) onAcceptFriendReminder(ctx context.Context, cb *tgbotapi.CallbackQuery, edit tgbotapi.EditMessageTextConfig, data string, sess session.Session) {
-	idxStr := strings.TrimPrefix(data, "accept_remind_")
-	idx, err := strconv.Atoi(idxStr)
+func (h *Handler) onAcceptFriendReminder(ctx context.Context, cb *tgbotapi.CallbackQuery, edit tgbotapi.EditMessageTextConfig, data string) {
+	idStr := strings.TrimPrefix(data, "accept_remind_")
+	reminderID, err := strconv.ParseInt(idStr, 10, 64)
 	if err != nil {
-		log.Printf("handler: invalid accept index: %v", err)
+		log.Printf("handler: invalid accept reminder ID: %v", err)
 		return
 	}
 
-	h.alertMu.RLock()
-	friendMsg, ok := h.alertMessages[idx]
-	h.alertMu.RUnlock()
-
-	if !ok {
-		log.Printf("handler: friend message not found for hash %d", idx)
-		return
-	}
-
-	parsed, err := h.reminders.ParseAndSave(ctx, cb.From.ID, friendMsg)
+	parsed, err := h.reminders.AcceptFriendReminder(ctx, reminderID, cb.From.ID)
 	if err != nil {
-		log.Printf("handler: save friend reminder failed: %v", err)
+		log.Printf("handler: accept friend reminder failed: %v", err)
+		edit.Text = "Не удалось принять напоминание."
+		kb := keyboard.Back()
+		edit.ReplyMarkup = &kb
+		h.bot.Send(edit)
 		return
 	}
 
-	if parsed.HasTime {
+	// Schedule if it has a time
+	if parsed.HasTime && parsed.Location != "" {
 		if err := h.scheduler.Schedule(ctx, parsed.ID, parsed.RemindAt, parsed.Location); err != nil {
-			log.Printf("handler: schedule friend reminder failed: %v", err)
+			log.Printf("handler: schedule accepted friend reminder failed: %v", err)
 		}
 	}
 
-	kb, text := keyboard.MainMenu()
-	edit.Text = text
+	edit.Text = "Напоминание принято!"
+	kb, _ := keyboard.MainMenu()
+	edit.ReplyMarkup = &kb
+	h.bot.Send(edit)
+	h.sessions.Clear(cb.From.ID)
+}
+
+// onDeclineFriendReminder handles declining a reminder from a friend.
+func (h *Handler) onDeclineFriendReminder(ctx context.Context, cb *tgbotapi.CallbackQuery, edit tgbotapi.EditMessageTextConfig, data string) {
+	idStr := strings.TrimPrefix(data, "decline_remind_")
+	reminderID, err := strconv.ParseInt(idStr, 10, 64)
+	if err != nil {
+		log.Printf("handler: invalid decline reminder ID: %v", err)
+		return
+	}
+
+	if err := h.reminders.DeclineFriendReminder(ctx, reminderID, cb.From.ID); err != nil {
+		log.Printf("handler: decline friend reminder failed: %v", err)
+	}
+
+	edit.Text = "Напоминание отклонено."
+	kb, _ := keyboard.MainMenu()
 	edit.ReplyMarkup = &kb
 	h.bot.Send(edit)
 	h.sessions.Clear(cb.From.ID)
