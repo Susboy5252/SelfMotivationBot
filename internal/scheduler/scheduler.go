@@ -30,24 +30,15 @@ func New(reminders repository.ReminderRepository, notify NotifyFunc) *Scheduler 
 // Schedule sets up a one-time job that fires at sendTime in the given timezone.
 // When the job fires, it verifies the reminder still exists and calls the notify function.
 func (s *Scheduler) Schedule(ctx context.Context, reminderID int64, sendTime time.Time, timezone string) error {
-	loc, err := time.LoadLocation(timezone)
-	if err != nil {
-		return fmt.Errorf("scheduler: invalid timezone %q: %w", timezone, err)
-	}
-
 	sched, err := gocron.NewScheduler()
 	if err != nil {
 		return fmt.Errorf("scheduler: failed to create scheduler: %w", err)
 	}
 
-	fireAt := time.Date(
-		sendTime.Year(), sendTime.Month(), sendTime.Day(),
-		sendTime.Hour(), sendTime.Minute(), sendTime.Second(),
-		0, loc,
-	)
-
+	// Use sendTime directly as it already represents the correct absolute moment.
+	// Do not reconstruct with a different timezone -- that would shift the fire time.
 	_, err = sched.NewJob(
-		gocron.OneTimeJob(gocron.OneTimeJobStartDateTime(fireAt)),
+		gocron.OneTimeJob(gocron.OneTimeJobStartDateTime(sendTime)),
 		gocron.NewTask(func() {
 			defer sched.Shutdown()
 

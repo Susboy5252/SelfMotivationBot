@@ -11,6 +11,7 @@ import (
 	"motivator/internal/service"
 	"regexp"
 	"strings"
+	"time"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -135,77 +136,60 @@ func (h *Handler) onReminderInput(ctx context.Context, chatID int64, username, t
 		sess.SenderUsername = username
 	}
 
-	// Save for the current user if self-mentioned or no mentions
+	// Always parse and save the reminder (we need the ID for recipient records too).
+	parsed, err := h.reminders.ParseAndSave(ctx, chatID, cleanText)
+	if err != nil {
+		log.Printf("handler: save reminder failed: %v", err)
+		h.send(chatID, "Произошла ошибка при сохранении. Попробуйте ещё раз.")
+		h.sessions.Clear(chatID)
+		return
+	}
+	sess.PendingReminderID = parsed.ID
+
+	// If no time found, ask for time or save as note
+	if !parsed.HasTime {
+		h.sendWithReplyKeyboard(chatID,
+			"<b>Напишите когда отправить напоминание</b>. Пример:\nсегодня в 16:00, завтра в 9\nчерез 10 минут, через 2 часа\n5 февраля в 14:00, 12.03.2026 в 10\n\nЛибо вы можете сохранить как заметку.",
+			keyboard.SaveAsNote(),
+		)
+		sess.State = session.StateWaitingForTime
+		h.sessions.Set(chatID, sess)
+		return
+	}
+
+	// Schedule for the sender only if they mentioned themselves or there are no mentions
 	if mentionsIncludeSelf || !hasMentions {
-		parsed, err := h.reminders.ParseAndSave(ctx, chatID, cleanText)
-		if err != nil {
-			log.Printf("handler: save reminder failed: %v", err)
-			h.send(chatID, "Произошла ошибка при сохранении. Попробуйте ещё раз.")
-			h.sessions.Clear(chatID)
-			return
-		}
-
-		if !parsed.HasTime {
-			// No time found -- ask for time or save as note
-			h.sendWithReplyKeyboard(chatID,
-				"<b>Напишите когда отправить напоминание</b>. Пример:\nсегодня в 16:00, завтра в 9\nчерез 10 минут, через 2 часа\n5 февраля в 14:00, 12.03.2026 в 10\n\nЛибо вы можете сохранить как заметку.",
-				keyboard.SaveAsNote(),
-			)
-			sess.State = session.StateWaitingForTime
-			sess.PendingReminderID = parsed.ID
-			h.sessions.Set(chatID, sess)
-			return
-		}
-
-		// Has time -- schedule it
 		if err := h.scheduler.Schedule(ctx, parsed.ID, parsed.RemindAt, parsed.Location); err != nil {
 			if strings.Contains(err.Error(), "start must not be in the past") {
 				h.send(chatID, "Время которое вы указали уже прошло. Введите будущее время.")
 				sess.State = session.StateWaitingForTime
-				sess.PendingReminderID = parsed.ID
 				h.sessions.Set(chatID, sess)
 				return
 			}
 			log.Printf("handler: schedule failed: %v", err)
 		}
+	}
 
-		sess.PendingReminderID = parsed.ID
+	// When the sender mentioned themselves, add them as a recipient with status='accepted'
+	// so the reminder appears in their list via the recipients query (not the creator query).
+	if mentionsIncludeSelf {
+		rec := &models.ReminderRecipient{
+			ReminderID: parsed.ID,
+			UserID:     chatID,
+			SenderID:   chatID,
+			Status:     "accepted",
+		}
+		if err := h.reminders.AddRecipient(ctx, rec); err != nil {
+			log.Printf("handler: failed to add self-recipient: %v", err)
+		}
+	}
+
+	if mentionsIncludeSelf || !hasMentions {
 		h.sendWithReplyKeyboard(chatID, "Напоминание успешно сохранено!", keyboard.OpenMainMenuButton())
 	}
 
-	// Send to mentioned friends using reminder_recipients
+	// Send to mentioned friends
 	if hasMentions && len(friendIDs) > 0 {
-		// If no reminder was saved yet for self (only sending to friends),
-		// save the reminder under the sender's name
-		if sess.PendingReminderID == 0 {
-			parsed, err := h.reminders.ParseAndSave(ctx, chatID, cleanText)
-			if err != nil {
-				log.Printf("handler: save reminder for friends failed: %v", err)
-				h.send(chatID, "Произошла ошибка при сохранении. Попробуйте ещё раз.")
-				h.sessions.Clear(chatID)
-				return
-			}
-
-			if !parsed.HasTime {
-				// No time -- ask for time or save as note, then send to friends
-				h.sendWithReplyKeyboard(chatID,
-					"<b>Напишите когда отправить напоминание</b>. Пример:\nсегодня в 16:00, завтра в 9\nчерез 10 минут, через 2 часа\n5 февраля в 14:00, 12.03.2026 в 10\n\nЛибо вы можете сохранить как заметку.",
-					keyboard.SaveAsNote(),
-				)
-				sess.State = session.StateWaitingForTime
-				sess.PendingReminderID = parsed.ID
-				h.sessions.Set(chatID, sess)
-				return
-			}
-
-			sess.PendingReminderID = parsed.ID
-
-			// Schedule for the creator
-			if err := h.scheduler.Schedule(ctx, parsed.ID, parsed.RemindAt, parsed.Location); err != nil {
-				log.Printf("handler: schedule for creator failed: %v", err)
-			}
-		}
-
 		h.sendFriendReminders(ctx, chatID, sess)
 		h.sendWithReplyKeyboard(chatID, "Напоминание отправлено друзьям!", keyboard.OpenMainMenuButton())
 	}
@@ -281,6 +265,8 @@ func (h *Handler) onPlanInput(ctx context.Context, chatID int64, text string) {
 }
 
 // sendFriendReminders adds recipients to the reminder and notifies them.
+// The display time is converted to each friend's local timezone so they see
+// the correct time without needing to know the sender's timezone.
 func (h *Handler) sendFriendReminders(ctx context.Context, senderChatID int64, sess session.Session) {
 	if sess.PendingReminderID == 0 {
 		log.Printf("handler: no pending reminder ID for friend reminders")
@@ -292,12 +278,6 @@ func (h *Handler) sendFriendReminders(ctx context.Context, senderChatID int64, s
 	if err != nil || rem == nil {
 		log.Printf("handler: pending reminder %d not found: %v", sess.PendingReminderID, err)
 		return
-	}
-
-	// Build display text: "TEXT от @username" (optionally with date)
-	displayText := rem.Content + " от @" + sess.SenderUsername
-	if rem.RemindAt != nil && !rem.RemindAt.IsZero() {
-		displayText += " " + service.FormatDateTimeRu(*rem.RemindAt)
 	}
 
 	kb := keyboard.FriendReminder(rem.ID)
@@ -313,6 +293,21 @@ func (h *Handler) sendFriendReminders(ctx context.Context, senderChatID int64, s
 		if err := h.reminders.AddRecipient(ctx, rec); err != nil {
 			log.Printf("handler: failed to add recipient %d: %v", friendID, err)
 			continue
+		}
+
+		// Build display text with time converted to the friend's timezone
+		displayText := rem.Content + " от @" + sess.SenderUsername
+		if rem.RemindAt != nil && !rem.RemindAt.IsZero() {
+			friendTZ, err := h.users.GetTimezone(ctx, friendID)
+			if err == nil && friendTZ != "" {
+				if loc, err := time.LoadLocation(friendTZ); err == nil {
+					displayText += " " + service.FormatDateTimeRu(rem.RemindAt.In(loc))
+				} else {
+					displayText += " " + service.FormatDateTimeRu(*rem.RemindAt)
+				}
+			} else {
+				displayText += " " + service.FormatDateTimeRu(*rem.RemindAt)
+			}
 		}
 
 		// Send notification to friend
