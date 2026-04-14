@@ -159,7 +159,7 @@ func (h *Handler) onReminderInput(ctx context.Context, chatID int64, username, t
 
 	// Schedule for the sender only if they mentioned themselves or there are no mentions
 	if mentionsIncludeSelf || !hasMentions {
-		if err := h.scheduler.Schedule(ctx, parsed.ID, parsed.RemindAt, parsed.Location); err != nil {
+		if err := h.scheduler.Schedule(ctx, chatID, parsed.ID, parsed.RemindAt, parsed.Location); err != nil {
 			if strings.Contains(err.Error(), "start must not be in the past") {
 				h.send(chatID, "Время которое вы указали уже прошло. Введите будущее время.")
 				sess.State = session.StateWaitingForTime
@@ -229,7 +229,7 @@ func (h *Handler) onTimeInput(ctx context.Context, chatID int64, text string, se
 	}
 
 	// Schedule the notification
-	if err := h.scheduler.Schedule(ctx, parsed.ID, parsed.RemindAt, parsed.Location); err != nil {
+	if err := h.scheduler.Schedule(ctx, chatID, parsed.ID, parsed.RemindAt, parsed.Location); err != nil {
 		if strings.Contains(err.Error(), "start must not be in the past") {
 			h.send(chatID, "Время которое вы указали уже прошло. Введите будущее время.")
 			return

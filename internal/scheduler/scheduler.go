@@ -10,8 +10,9 @@ import (
 	"github.com/go-co-op/gocron/v2"
 )
 
-// NotifyFunc is called when a reminder fires. It receives the reminder ID and content.
-type NotifyFunc func(reminderID int64, content string)
+// NotifyFunc is called when a reminder fires. It receives the target chat ID,
+// reminder ID, and content.
+type NotifyFunc func(chatID int64, reminderID int64, content string)
 
 // Scheduler manages one-time reminder jobs.
 type Scheduler struct {
@@ -27,9 +28,10 @@ func New(reminders repository.ReminderRepository, notify NotifyFunc) *Scheduler 
 	}
 }
 
-// Schedule sets up a one-time job that fires at sendTime in the given timezone.
+// Schedule sets up a one-time job that fires at sendTime.
+// chatID is the Telegram user who should receive the notification.
 // When the job fires, it verifies the reminder still exists and calls the notify function.
-func (s *Scheduler) Schedule(ctx context.Context, reminderID int64, sendTime time.Time, timezone string) error {
+func (s *Scheduler) Schedule(ctx context.Context, chatID int64, reminderID int64, sendTime time.Time, timezone string) error {
 	sched, err := gocron.NewScheduler()
 	if err != nil {
 		return fmt.Errorf("scheduler: failed to create scheduler: %w", err)
@@ -52,7 +54,7 @@ func (s *Scheduler) Schedule(ctx context.Context, reminderID int64, sendTime tim
 				return
 			}
 
-			s.notify(reminderID, rem.Content)
+			s.notify(chatID, reminderID, rem.Content)
 		}),
 	)
 	if err != nil {

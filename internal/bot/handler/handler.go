@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"context"
 	"log"
 	"motivator/internal/bot/keyboard"
 	"motivator/internal/bot/session"
@@ -53,19 +52,13 @@ func (h *Handler) HandleUpdate(update tgbotapi.Update) {
 }
 
 // OnReminderFired is called by the scheduler when a reminder's time arrives.
-func (h *Handler) OnReminderFired(reminderID int64, content string) {
-	ctx := context.Background()
-	rem, err := h.reminders.GetByID(ctx, reminderID)
-	if err != nil || rem == nil {
-		log.Printf("handler: reminder %d not found for notification", reminderID)
-		return
-	}
-
+// chatID is the target Telegram user who should receive the notification.
+func (h *Handler) OnReminderFired(chatID int64, reminderID int64, content string) {
 	text, kb := keyboard.RemindAgain(content)
-	msg := tgbotapi.NewMessage(rem.CreatorID, text)
+	msg := tgbotapi.NewMessage(chatID, text)
 	msg.ReplyMarkup = kb
 	if _, err := h.bot.Send(msg); err != nil {
-		log.Printf("handler: failed to send reminder notification: %v", err)
+		log.Printf("handler: failed to send reminder notification to %d: %v", chatID, err)
 	}
 }
 

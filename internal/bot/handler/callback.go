@@ -254,7 +254,7 @@ func (h *Handler) onReschedule(ctx context.Context, cb *tgbotapi.CallbackQuery, 
 	}
 
 	if parsed.HasTime {
-		if err := h.scheduler.Schedule(ctx, parsed.ID, parsed.RemindAt, parsed.Location); err != nil {
+		if err := h.scheduler.Schedule(ctx, chatID, parsed.ID, parsed.RemindAt, parsed.Location); err != nil {
 			log.Printf("handler: schedule failed: %v", err)
 		}
 	}
@@ -302,9 +302,9 @@ func (h *Handler) onAcceptFriendReminder(ctx context.Context, cb *tgbotapi.Callb
 		return
 	}
 
-	// Schedule if it has a time
+	// Schedule if it has a time -- notify the friend (cb.From.ID), not the creator
 	if parsed.HasTime && parsed.Location != "" {
-		if err := h.scheduler.Schedule(ctx, parsed.ID, parsed.RemindAt, parsed.Location); err != nil {
+		if err := h.scheduler.Schedule(ctx, cb.From.ID, parsed.ID, parsed.RemindAt, parsed.Location); err != nil {
 			log.Printf("handler: schedule accepted friend reminder failed: %v", err)
 		}
 	}

@@ -38,9 +38,9 @@ func New(api *tgbotapi.BotAPI, pool *pgxpool.Pool, geoUsername string) *Bot {
 
 	// Scheduler (notify callback will be set by handler)
 	var notifyFn scheduler.NotifyFunc
-	sched := scheduler.New(reminderRepo, func(reminderID int64, content string) {
+	sched := scheduler.New(reminderRepo, func(chatID int64, reminderID int64, content string) {
 		if notifyFn != nil {
-			notifyFn(reminderID, content)
+			notifyFn(chatID, reminderID, content)
 		}
 	})
 
