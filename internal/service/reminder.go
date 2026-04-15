@@ -209,8 +209,8 @@ func (s *ReminderService) SetTime(ctx context.Context, userID int64, timeText st
 }
 
 // GetAll returns all reminders for a user (own + accepted from friends).
-func (s *ReminderService) GetAll(ctx context.Context, userID int64) ([]models.Reminder, error) {
-	return s.reminders.GetAllForUser(ctx, userID)
+func (s *ReminderService) GetAll(ctx context.Context, userID int64, timeZone string) ([]models.Reminder, error) {
+	return s.reminders.GetAllForUser(ctx, userID, timeZone)
 }
 
 // GetByID returns a single reminder by its database ID.

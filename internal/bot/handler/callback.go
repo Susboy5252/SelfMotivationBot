@@ -338,7 +338,8 @@ func (h *Handler) onDeclineFriendReminder(ctx context.Context, cb *tgbotapi.Call
 
 // showReminders fetches and displays the paginated reminder list.
 func (h *Handler) showReminders(ctx context.Context, chatID int64, messageID int, page int) {
-	reminders, err := h.reminders.GetAll(ctx, chatID)
+	timeZone, err := h.users.GetTimezone(ctx, chatID)
+	reminders, err := h.reminders.GetAll(ctx, chatID, timeZone)
 	if err != nil {
 		log.Printf("handler: get reminders failed: %v", err)
 		return

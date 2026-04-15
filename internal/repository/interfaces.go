@@ -18,7 +18,7 @@ type UserRepository interface {
 type ReminderRepository interface {
 	Create(ctx context.Context, r *models.Reminder) (int64, error)
 	GetByCreatorID(ctx context.Context, creatorID int64) ([]models.Reminder, error)
-	GetAllForUser(ctx context.Context, userID int64) ([]models.Reminder, error)
+	GetAllForUser(ctx context.Context, userID int64, timeZone string) ([]models.Reminder, error)
 	GetByID(ctx context.Context, id int64) (*models.Reminder, error)
 	UpdateRemindAt(ctx context.Context, id int64, remindAt interface{}) error
 	ToggleDone(ctx context.Context, id int64) error

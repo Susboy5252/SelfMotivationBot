@@ -58,27 +58,30 @@ func (r *reminderRepo) GetByCreatorID(ctx context.Context, creatorID int64) ([]m
 // For friend reminders, it fills SenderUsername from the sender's username.
 // Excludes reminders where the creator only sent them to friends (has recipients but
 // creator is not among them).
-func (r *reminderRepo) GetAllForUser(ctx context.Context, userID int64) ([]models.Reminder, error) {
+func (r *reminderRepo) GetAllForUser(ctx context.Context, userID int64, timeZone string) ([]models.Reminder, error) {
 	query := `
-		SELECT r.id, r.creator_id, r.content, r.remind_at, r.done, '' AS sender_username
-		FROM reminders r
-		WHERE r.creator_id = $1
-		  AND NOT EXISTS (
-		    SELECT 1 FROM reminder_recipients rr WHERE rr.reminder_id = r.id AND rr.user_id = $1
-		  )
-		  AND NOT EXISTS (
-		    SELECT 1 FROM reminder_recipients rr2 WHERE rr2.reminder_id = r.id
-		  )
-		UNION ALL
-		SELECT r.id, r.creator_id, r.content, r.remind_at, rr.done, u.username AS sender_username
-		FROM reminders r
-		JOIN reminder_recipients rr ON rr.reminder_id = r.id
-		JOIN users u ON u.id = rr.sender_id
-		WHERE rr.user_id = $1 AND rr.status = 'accepted'
-		ORDER BY id ASC
+			SELECT r.id, r.creator_id, r.content, 
+       r.remind_at AT TIME ZONE $2 AS remind_at, 
+       r.done, '' AS sender_username
+FROM reminders r
+WHERE r.creator_id = $1
+  AND NOT EXISTS (
+    SELECT 1 FROM reminder_recipients rr WHERE rr.reminder_id = r.id AND rr.user_id = $1
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM reminder_recipients rr2 WHERE rr2.reminder_id = r.id
+  )
+UNION ALL
+SELECT r.id, r.creator_id, r.content, 
+       r.remind_at AT TIME ZONE $2 AS remind_at, 
+       rr.done, u.username AS sender_username
+FROM reminders r
+JOIN reminder_recipients rr ON rr.reminder_id = r.id
+JOIN users u ON u.id = rr.sender_id
+WHERE rr.user_id = $1 AND rr.status = 'accepted'
+ORDER BY id ASC;
 	`
-
-	rows, err := r.pool.Query(ctx, query, userID)
+	rows, err := r.pool.Query(ctx, query, userID, timeZone)
 	if err != nil {
 		return nil, fmt.Errorf("reminderRepo.GetAllForUser: %w", err)
 	}
