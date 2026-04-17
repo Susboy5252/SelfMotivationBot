@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
+	"github.com/nicksnyder/go-i18n/v2/i18n"
 )
 
 // handleCallback processes inline keyboard button presses.
@@ -347,12 +348,19 @@ func (h *Handler) onDeclineFriendReminder(ctx context.Context, cb *tgbotapi.Call
 
 func (h *Handler) onChangeLanguage(ctx context.Context, cb *tgbotapi.CallbackQuery, edit tgbotapi.EditMessageTextConfig, chatID int64, data string) {
 	h.bot.Request(tgbotapi.NewCallback(cb.ID, ""))
-	lng := strings.TrimPrefix(data, "language_")
+		lng := strings.TrimPrefix(data, "language_")
 	h.users.SetLanguage(ctx, chatID, lng)
 	flow := h.sessions.Get(cb.Message.Chat.ID)
+	user, err := h.users.GetUser(ctx, chatID)
+	if err != nil {
+		fmt.Errorf("Callback: change language %w", err)
+		return
+	}
+	text := h.T(user.Language, "ChangeCity")
+
 		switch flow.State {
 		case session.StateWaitingForLanguage:
-			rmMsg := tgbotapi.NewMessage(chatID, "Пожалуйста, введи свой город, чтобы узнать твой часовой пояс.")
+			rmMsg := tgbotapi.NewMessage(chatID, text)
 			rmMsg.ReplyMarkup = keyboard.RemoveKeyboard()
 			h.bot.Send(rmMsg)
 			h.sessions.SetState(chatID, session.StateWaitingForCity)
@@ -380,4 +388,16 @@ func (h *Handler) showReminders(ctx context.Context, chatID int64, messageID int
 	edit.ParseMode = tgbotapi.ModeHTML
 	edit.ReplyMarkup = &kb
 	h.bot.Send(edit)
+}
+
+func (h *Handler) T(lang, key string) string {
+    localizer := i18n.NewLocalizer(h.bundle, lang)
+    msg, err := localizer.Localize(&i18n.LocalizeConfig{
+        MessageID: key,
+    })
+    if err != nil {
+        return key
+    }
+
+    return msg
 }

@@ -10,4 +10,5 @@ type User struct {
 	TimeZone  string
 	CreatedAt time.Time
 	UpdatedAt time.Time
+	Language string
 }

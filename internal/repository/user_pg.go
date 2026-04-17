@@ -33,11 +33,11 @@ func (r *userRepo) Create(ctx context.Context, id int64, username string) error 
 
 func (r *userRepo) GetByID(ctx context.Context, id int64) (*models.User, error) {
 	row := r.pool.QueryRow(ctx,
-		"SELECT id, username, city, timezone, created_at, updated_at FROM users WHERE id = $1", id,
+		"SELECT id, username, city, timezone, language, created_at, updated_at FROM users WHERE id = $1", id,
 	)
 
 	var u models.User
-	err := row.Scan(&u.ID, &u.Username, &u.City, &u.TimeZone, &u.CreatedAt, &u.UpdatedAt)
+	err := row.Scan(&u.ID, &u.Username, &u.City, &u.TimeZone, &u.Language, &u.CreatedAt, &u.UpdatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, nil

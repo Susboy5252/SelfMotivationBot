@@ -6,6 +6,7 @@ import (
 	"motivator/internal/bot/session"
 	"motivator/internal/scheduler"
 	"motivator/internal/service"
+	"github.com/nicksnyder/go-i18n/v2/i18n"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
@@ -18,6 +19,7 @@ type Handler struct {
 	plans     *service.PlanService
 	sessions  *session.Manager
 	scheduler *scheduler.Scheduler
+	bundle *i18n.Bundle
 }
 
 // New creates a Handler with all required dependencies.
@@ -28,6 +30,7 @@ func New(
 	plans *service.PlanService,
 	sessions *session.Manager,
 	sched *scheduler.Scheduler,
+	bundle *i18n.Bundle,
 ) *Handler {
 	return &Handler{
 		bot:       bot,
@@ -36,6 +39,7 @@ func New(
 		plans:     plans,
 		sessions:  sessions,
 		scheduler: sched,
+		bundle: bundle,
 	}
 }
 

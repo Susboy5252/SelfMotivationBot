@@ -9,9 +9,12 @@ import (
 	"motivator/internal/repository"
 	"motivator/internal/scheduler"
 	"motivator/internal/service"
+	"golang.org/x/text/language"
+	"encoding/json"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/nicksnyder/go-i18n/v2/i18n"
 )
 
 // Bot is the top-level Telegram bot coordinator.
@@ -35,7 +38,13 @@ func New(api *tgbotapi.BotAPI, pool *pgxpool.Pool, geoUsername string) *Bot {
 
 	// Session manager
 	sessions := session.NewManager()
-
+	
+	var bundle *i18n.Bundle
+	bundle = i18n.NewBundle(language.English)
+	bundle.RegisterUnmarshalFunc("json", json.Unmarshal)
+	// Load your translation files
+	bundle.MustLoadMessageFile("locales/en.json")
+	bundle.MustLoadMessageFile("locales/ru.json")
 	// Scheduler (notify callback will be set by handler)
 	var notifyFn scheduler.NotifyFunc
 	sched := scheduler.New(reminderRepo, func(chatID int64, reminderID int64, content string) {
@@ -45,7 +54,7 @@ func New(api *tgbotapi.BotAPI, pool *pgxpool.Pool, geoUsername string) *Bot {
 	})
 
 	// Handler
-	h := handler.New(api, userSvc, reminderSvc, planSvc, sessions, sched)
+	h := handler.New(api, userSvc, reminderSvc, planSvc, sessions, sched, bundle)
 
 	// Wire the notify function back to the handler
 	notifyFn = h.OnReminderFired
