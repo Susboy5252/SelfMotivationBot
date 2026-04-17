@@ -84,3 +84,14 @@ func (r *userRepo) UpdateTimezone(ctx context.Context, id int64, timezone string
 	}
 	return nil
 }
+
+func (r *userRepo) UpdateLanguage(ctx context.Context, id int64, language string) error {
+
+	_, err := r.pool.Exec(ctx, "UPDATE users set language = $1, updated_at = now() Where id = $2",
+	language, id,
+)
+	if err != nil {
+		return fmt.Errorf("userRepo.UpdateLanguage: %w", err)
+	}
+	return nil
+}

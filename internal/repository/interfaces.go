@@ -11,6 +11,7 @@ type UserRepository interface {
 	GetByID(ctx context.Context, id int64) (*models.User, error)
 	GetByUsername(ctx context.Context, username string) (*models.User, error)
 	UpdateCity(ctx context.Context, id int64, city string) error
+	UpdateLanguage(ctx context.Context, id int64, language string) error
 	UpdateTimezone(ctx context.Context, id int64, timezone string) error
 }
 

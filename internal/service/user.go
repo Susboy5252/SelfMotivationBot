@@ -70,6 +70,13 @@ func (s *UserService) SetCity(ctx context.Context, userID int64, city string) (t
 	return tz, nil
 }
 
+func (s *UserService) SetLanguage(ctx context.Context, userID int64, language string) error {
+	if err := s.users.UpdateLanguage(ctx, userID, language); err != nil {
+		return err
+	}
+	return nil
+}
+
 // GetTimezone returns the user's timezone.
 func (s *UserService) GetTimezone(ctx context.Context, userID int64) (string, error) {
 	u, err := s.users.GetByID(ctx, userID)

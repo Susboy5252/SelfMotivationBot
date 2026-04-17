@@ -48,6 +48,7 @@ func Settings() tgbotapi.InlineKeyboardMarkup {
 	return tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData("Ввести город заново", "find_local_zone"),
+			tgbotapi.NewInlineKeyboardButtonData("Выбрать язык", "change_language"),
 		),
 		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData("⬅️ Вернуться", "go_to_menu"),
@@ -230,6 +231,15 @@ func FriendReminder(reminderID int64) tgbotapi.InlineKeyboardMarkup {
 		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData("Принять", fmt.Sprintf("accept_remind_%d", reminderID)),
 			tgbotapi.NewInlineKeyboardButtonData("Отклонить", fmt.Sprintf("decline_remind_%d", reminderID)),
+		),
+	)
+}
+
+func SelectLanguage() tgbotapi.InlineKeyboardMarkup {
+	return tgbotapi.NewInlineKeyboardMarkup(
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData("English", "language_en"),
+			tgbotapi.NewInlineKeyboardButtonData("Русский", "language_ru"),
 		),
 	)
 }

@@ -12,6 +12,7 @@ const (
 	StateWaitingForTime     State = "waiting_for_data_reminder"
 	StateWaitingForPlan     State = "waiting_for_plan"
 	StateWaitingForOwnTime  State = "waiting_for_own_time"
+	StateWaitingForLanguage State = "waiting_for_language"
 )
 
 // Session holds per-user conversational context.

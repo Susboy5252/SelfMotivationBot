@@ -57,10 +57,10 @@ func (h *Handler) handleCommand(ctx context.Context, chatID int64, username, com
 
 	switch command {
 	case "start":
-		rmMsg := tgbotapi.NewMessage(chatID, "Привет! Пожалуйста, введи свой город, чтобы узнать твой часовой пояс.")
-		rmMsg.ReplyMarkup = keyboard.RemoveKeyboard()
-		h.bot.Send(rmMsg)
-		h.sessions.SetState(chatID, session.StateWaitingForCity)
+		lngMsg := tgbotapi.NewMessage(chatID, "Hello! Choose your language")
+		lngMsg.ReplyMarkup = keyboard.SelectLanguage()
+		h.sessions.SetState(chatID, session.StateWaitingForLanguage)
+		h.bot.Send(lngMsg)
 	}
 }
 

@@ -26,6 +26,8 @@ func (h *Handler) handleCallback(update tgbotapi.Update) {
 
 	// Route by callback data prefix
 	switch {
+	case strings.HasPrefix(data, "language_"):
+		h.onChangeLanguage(ctx, cb, edit, chatID, data)
 	case strings.HasPrefix(data, "remindme_"):
 		h.onSelectReminder(ctx, cb, edit, data)
 	case strings.HasPrefix(data, "remind_next_"):
@@ -79,6 +81,13 @@ func (h *Handler) handleCallbackAction(ctx context.Context, cb *tgbotapi.Callbac
 		edit.Text = "Введите ваш город. Пример: Лондон, Киев, Москва"
 		h.bot.Send(edit)
 		h.sessions.SetState(chatID, session.StateWaitingForCity)
+
+	case "change_language":
+		h.bot.Request(tgbotapi.NewCallback(cb.ID, ""))
+		edit.Text = "Choose your language"
+		kb := keyboard.SelectLanguage()
+		edit.ReplyMarkup = &kb
+		h.bot.Send(edit)
 
 	case "settings":
 		tz, err := h.users.GetTimezone(ctx, chatID)
@@ -335,6 +344,27 @@ func (h *Handler) onDeclineFriendReminder(ctx context.Context, cb *tgbotapi.Call
 	h.bot.Send(edit)
 	h.sessions.Clear(cb.From.ID)
 }
+
+func (h *Handler) onChangeLanguage(ctx context.Context, cb *tgbotapi.CallbackQuery, edit tgbotapi.EditMessageTextConfig, chatID int64, data string) {
+	h.bot.Request(tgbotapi.NewCallback(cb.ID, ""))
+	lng := strings.TrimPrefix(data, "language_")
+	h.users.SetLanguage(ctx, chatID, lng)
+	flow := h.sessions.Get(cb.Message.Chat.ID)
+		switch flow.State {
+		case session.StateWaitingForLanguage:
+			rmMsg := tgbotapi.NewMessage(chatID, "Пожалуйста, введи свой город, чтобы узнать твой часовой пояс.")
+			rmMsg.ReplyMarkup = keyboard.RemoveKeyboard()
+			h.bot.Send(rmMsg)
+			h.sessions.SetState(chatID, session.StateWaitingForCity)
+			return
+		default:
+			kb, menuText := keyboard.MainMenu()
+			edit.Text = menuText
+			edit.ReplyMarkup = &kb
+			h.bot.Send(edit)
+		return
+	}
+		}
 
 // showReminders fetches and displays the paginated reminder list.
 func (h *Handler) showReminders(ctx context.Context, chatID int64, messageID int, page int) {
