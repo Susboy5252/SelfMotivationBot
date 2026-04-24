@@ -36,7 +36,7 @@ func (h *Handler) handleMessage(update tgbotapi.Update) {
 
 	// Handle "Open main menu" reply keyboard button
 	if text == "Открыть главное меню" {
-		kb, menuText := keyboard.MainMenu()
+		kb, menuText := keyboard.MainMenu(h.HandleUserLanguage(ctx, chatID, "AddReminder"), h.HandleUserLanguage(ctx, chatID, "GetReminders"), h.HandleUserLanguage(ctx, chatID, "Settings"), h.HandleUserLanguage(ctx, chatID, "WriteOwner"), h.HandleUserLanguage(ctx, chatID, "MainMenu"))
 		h.sendWithKeyboard(chatID, menuText, kb)
 		return
 	}
@@ -86,16 +86,18 @@ func (h *Handler) onCityInput(ctx context.Context, chatID int64, city string) {
 	tz, err := h.users.SetCity(ctx, chatID, city)
 	if err != nil {
 		log.Printf("handler: set city failed: %v", err)
-		h.send(chatID, "Не смогли найти ваш город, попробуйте ввести ещё раз.\nПример: Лондон, Киев, Москва")
+		text := h.HandleUserLanguage(ctx, chatID, "CityNotFound")
+		h.send(chatID, text)
 		return
 	}
 
 	h.sessions.SetState(chatID, session.StateNone)
 
 	localTime, _ := service.GetLocalTime(tz)
-	text := fmt.Sprintf("<b>Ваша временная зона:</b> %s\n<b>Ваше локальное время:</b> %s", tz, localTime)
-	kb := keyboard.ConfirmTimezone()
-	h.sendWithKeyboard(chatID, text, kb)
+	text := h.HandleUserLanguage(ctx, chatID, "TimezoneInfo")
+	textToSend := fmt.Sprintf(text, tz, localTime)
+	kb := keyboard.ConfirmTimezone(h.HandleUserLanguage(ctx, chatID, "ConfirmTimeZone"), h.HandleUserLanguage(ctx, chatID, "DeclineTimeZone"))
+	h.sendWithKeyboard(chatID, textToSend, kb)
 }
 
 // onReminderInput handles the text of a new reminder, including @mentions.
@@ -108,7 +110,8 @@ func (h *Handler) onReminderInput(ctx context.Context, chatID int64, username, t
 
 	// Validate: text must not be empty (even with mentions)
 	if cleanText == "" {
-		h.send(chatID, "Текст напоминания не может быть пустым. Напишите что нужно напомнить, например:\n<code>купить молоко @друг завтра в 10</code>")
+		text := h.HandleUserLanguage(ctx, chatID, "EmptyReminderText")
+		h.send(chatID, text)
 		return
 	}
 
@@ -123,7 +126,8 @@ func (h *Handler) onReminderInput(ctx context.Context, chatID int64, username, t
 			}
 			u, err := h.users.ResolveUserByUsername(ctx, un)
 			if errors.Is(err, service.ErrUserNotFound) {
-				h.send(chatID, fmt.Sprintf("Пользователь %s не пользуется этим ботом, введите напоминание ещё раз.", m))
+				text := h.HandleUserLanguage(ctx, chatID, "UserDontUseThisBot")
+				h.send(chatID, fmt.Sprintf(text, m))
 				return
 			}
 			if err != nil {
@@ -148,9 +152,9 @@ func (h *Handler) onReminderInput(ctx context.Context, chatID int64, username, t
 
 	// If no time found, ask for time or save as note
 	if !parsed.HasTime {
-		h.sendWithReplyKeyboard(chatID,
-			"<b>Напишите когда отправить напоминание</b>. Пример:\nсегодня в 16:00, завтра в 9\nчерез 10 минут, через 2 часа\n5 февраля в 14:00, 12.03.2026 в 10\n\nЛибо вы можете сохранить как заметку.",
-			keyboard.SaveAsNote(),
+			text := h.HandleUserLanguage(ctx, chatID, "ExampleOfReminder")
+		h.sendWithReplyKeyboard(chatID, text,
+			keyboard.SaveAsNote(h.HandleUserLanguage(ctx, chatID, "SaveAsNote")),
 		)
 		sess.State = session.StateWaitingForTime
 		h.sessions.Set(chatID, sess)
@@ -160,8 +164,8 @@ func (h *Handler) onReminderInput(ctx context.Context, chatID int64, username, t
 	// Schedule for the sender only if they mentioned themselves or there are no mentions
 	if mentionsIncludeSelf || !hasMentions {
 		if err := h.scheduler.Schedule(ctx, chatID, parsed.ID, parsed.RemindAt, parsed.Location); err != nil {
-			if strings.Contains(err.Error(), "start must not be in the past") {
-				h.send(chatID, "Время которое вы указали уже прошло. Введите будущее время.")
+			if strings.Contains(err.Error(), "start must not be in the past") { text := h.HandleUserLanguage(ctx, chatID, "ErrorSentEariler")
+				h.send(chatID, text)
 				sess.State = session.StateWaitingForTime
 				h.sessions.Set(chatID, sess)
 				return
@@ -185,17 +189,19 @@ func (h *Handler) onReminderInput(ctx context.Context, chatID int64, username, t
 	}
 
 	if mentionsIncludeSelf || !hasMentions {
-		h.sendWithReplyKeyboard(chatID, "Напоминание успешно сохранено!", keyboard.OpenMainMenuButton())
+		text := h.HandleUserLanguage(ctx, chatID, "ReminderIsSaved")
+		h.sendWithReplyKeyboard(chatID, text, keyboard.OpenMainMenuButton(h.HandleUserLanguage(ctx, chatID, "OpenMainMenu")))
 	}
 
 	// Send to mentioned friends
 	if hasMentions && len(friendIDs) > 0 {
 		h.sendFriendReminders(ctx, chatID, sess)
-		h.sendWithReplyKeyboard(chatID, "Напоминание отправлено друзьям!", keyboard.OpenMainMenuButton())
+		text := h.HandleUserLanguage(ctx, chatID, "ReminderSentToFriends")
+		h.sendWithReplyKeyboard(chatID, text, keyboard.OpenMainMenuButton(h.HandleUserLanguage(ctx, chatID, "OpenMainMenu")))
 	}
 
 	// Show main menu
-	kb, menuText := keyboard.MainMenu()
+	kb, menuText := keyboard.MainMenu(h.HandleUserLanguage(ctx, chatID, "AddReminder"), h.HandleUserLanguage(ctx, chatID, "GetReminders"), h.HandleUserLanguage(ctx, chatID, "Settings"), h.HandleUserLanguage(ctx, chatID, "WriteOwner"), h.HandleUserLanguage(ctx, chatID, "MainMenu"))
 	h.sendWithKeyboard(chatID, menuText, kb)
 	h.sessions.Clear(chatID)
 }
@@ -204,14 +210,15 @@ func (h *Handler) onReminderInput(ctx context.Context, chatID int64, username, t
 func (h *Handler) onTimeInput(ctx context.Context, chatID int64, text string, sess session.Session) {
 	// "Save as note" button
 	if text == "Сохранить как заметку" {
-		h.sendWithReplyKeyboard(chatID, "Сохранено как заметку", keyboard.OpenMainMenuButton())
+		text := h.HandleUserLanguage(ctx, chatID, "SavedAsNote")
+		h.sendWithReplyKeyboard(chatID, text, keyboard.OpenMainMenuButton(h.HandleUserLanguage(ctx, chatID, "OpenMainMenu")))
 
 		// Send to friends if there are mentions (as a note)
 		if len(sess.MentionedIDs) > 0 {
 			h.sendFriendReminders(ctx, chatID, sess)
 		}
 
-		kb, menuText := keyboard.MainMenu()
+		kb, menuText := keyboard.MainMenu(h.HandleUserLanguage(ctx, chatID, "AddReminder"), h.HandleUserLanguage(ctx, chatID, "GetReminders"), h.HandleUserLanguage(ctx, chatID, "Settings"), h.HandleUserLanguage(ctx, chatID, "WriteOwner"), h.HandleUserLanguage(ctx, chatID, "MainMenu"))
 		h.sendWithKeyboard(chatID, menuText, kb)
 		h.sessions.Clear(chatID)
 		return
@@ -221,9 +228,9 @@ func (h *Handler) onTimeInput(ctx context.Context, chatID int64, text string, se
 	parsed, err := h.reminders.SetTime(ctx, chatID, text)
 	if err != nil {
 		log.Printf("handler: set time failed: %v", err)
-		h.sendWithReplyKeyboard(chatID,
-			"<b>Не удалось распознать время.</b> Попробуйте ещё раз. Пример:\nсегодня в 16:00, завтра в 9\nчерез 10 минут, через 2 часа\n5 февраля в 14:00, 12.03.2026 в 10\n\nЛибо вы можете сохранить как заметку.",
-			keyboard.SaveAsNote(),
+		text := h.HandleUserLanguage(ctx, chatID, "CantGetUserTime")
+		h.sendWithReplyKeyboard(chatID, text,
+			keyboard.SaveAsNote(h.HandleUserLanguage(ctx, chatID, "SaveAsNote")),
 		)
 		return
 	}
@@ -231,22 +238,24 @@ func (h *Handler) onTimeInput(ctx context.Context, chatID int64, text string, se
 	// Schedule the notification
 	if err := h.scheduler.Schedule(ctx, chatID, parsed.ID, parsed.RemindAt, parsed.Location); err != nil {
 		if strings.Contains(err.Error(), "start must not be in the past") {
-			h.send(chatID, "Время которое вы указали уже прошло. Введите будущее время.")
+			text := h.HandleUserLanguage(ctx, chatID, "ErrorSentEariler")
+			h.send(chatID, text)
 			return
 		}
 		log.Printf("handler: schedule after time input failed: %v", err)
-		h.send(chatID, "Не удалось запланировать напоминание. Попробуйте ещё раз.")
+		text := h.HandleUserLanguage(ctx, chatID, "CantPlanReminder")
+		h.send(chatID, text)
 		return
 	}
-
-	h.sendWithReplyKeyboard(chatID, "Напоминание сохранено!", keyboard.OpenMainMenuButton())
+		text = h.HandleUserLanguage(ctx, chatID, "ReminderIsSaved")
+	h.sendWithReplyKeyboard(chatID, text, keyboard.OpenMainMenuButton(h.HandleUserLanguage(ctx, chatID, "OpenMainMenu")))
 
 	// Send to friends if applicable
 	if len(sess.MentionedIDs) > 0 {
 		h.sendFriendReminders(ctx, chatID, sess)
 	}
-
-	kb, menuText := keyboard.MainMenu()
+	
+	kb, menuText := keyboard.MainMenu(h.HandleUserLanguage(ctx, chatID, "AddReminder"), h.HandleUserLanguage(ctx, chatID, "GetReminders"), h.HandleUserLanguage(ctx, chatID, "Settings"), h.HandleUserLanguage(ctx, chatID, "WriteOwner"), h.HandleUserLanguage(ctx, chatID, "MainMenu"))
 	h.sendWithKeyboard(chatID, menuText, kb)
 	h.sessions.Clear(chatID)
 }
@@ -260,7 +269,7 @@ func (h *Handler) onPlanInput(ctx context.Context, chatID int64, text string) {
 		return
 	}
 
-	h.sendWithReplyKeyboard(chatID, "План сохранён!", keyboard.OpenMainMenuButton())
+	h.sendWithReplyKeyboard(chatID, "План сохранён!", keyboard.OpenMainMenuButton(h.HandleUserLanguage(ctx, chatID, "OpenMainMenu")))
 	h.sessions.Clear(chatID)
 }
 
@@ -280,8 +289,6 @@ func (h *Handler) sendFriendReminders(ctx context.Context, senderChatID int64, s
 		return
 	}
 
-	kb := keyboard.FriendReminder(rem.ID)
-
 	for _, friendID := range sess.MentionedIDs {
 		// Add recipient record in the database
 		rec := &models.ReminderRecipient{
@@ -290,13 +297,17 @@ func (h *Handler) sendFriendReminders(ctx context.Context, senderChatID int64, s
 			SenderID:   senderChatID,
 			Status:     "pending",
 		}
+	
+	kb := keyboard.FriendReminder(rem.ID, h.HandleUserLanguage(ctx, friendID, "Accept"), h.HandleUserLanguage(ctx, friendID, "Decline"))
+
 		if err := h.reminders.AddRecipient(ctx, rec); err != nil {
 			log.Printf("handler: failed to add recipient %d: %v", friendID, err)
 			continue
 		}
 
 		// Build display text with time converted to the friend's timezone
-		displayText := rem.Content + " от @" + sess.SenderUsername
+		text := h.HandleUserLanguage(ctx, friendID, "FromAt")
+		displayText := rem.Content + text + sess.SenderUsername
 		if rem.RemindAt != nil && !rem.RemindAt.IsZero() {
 			friendTZ, err := h.users.GetTimezone(ctx, friendID)
 			if err == nil && friendTZ != "" {

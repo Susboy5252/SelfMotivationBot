@@ -1,11 +1,13 @@
 package handler
 
 import (
+	"context"
 	"log"
 	"motivator/internal/bot/keyboard"
 	"motivator/internal/bot/session"
 	"motivator/internal/scheduler"
 	"motivator/internal/service"
+
 	"github.com/nicksnyder/go-i18n/v2/i18n"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -58,7 +60,7 @@ func (h *Handler) HandleUpdate(update tgbotapi.Update) {
 // OnReminderFired is called by the scheduler when a reminder's time arrives.
 // chatID is the target Telegram user who should receive the notification.
 func (h *Handler) OnReminderFired(chatID int64, reminderID int64, content string) {
-	text, kb := keyboard.RemindAgain(content)
+	text, kb := keyboard.RemindAgain(content, h.HandleUserLanguage(context.Background(), chatID, "RemindAgain"), h.HandleUserLanguage(context.Background(), chatID, "HalfHour"), h.HandleUserLanguage(context.Background(), chatID, "Hour"), h.HandleUserLanguage(context.Background(), chatID, "3Hours"), h.HandleUserLanguage(context.Background(), chatID, "Tomorrow"), h.HandleUserLanguage(context.Background(), chatID, "OwnTime"), h.HandleUserLanguage(context.Background(), chatID, "Back"))
 	msg := tgbotapi.NewMessage(chatID, text)
 	msg.ReplyMarkup = kb
 	if _, err := h.bot.Send(msg); err != nil {
@@ -93,4 +95,48 @@ func (h *Handler) sendWithReplyKeyboard(chatID int64, text string, kb tgbotapi.R
 	if _, err := h.bot.Send(msg); err != nil {
 		log.Printf("handler: failed to send message with reply keyboard: %v", err)
 	}
+}
+
+func (h *Handler) HandleUserLanguage(ctx context.Context, userID int64, field string) string {
+	sess := h.sessions.Get(userID)
+	if sess.Language != "" {
+		log.Println("Got it from sessions")
+		return h.T(sess.Language, field)
+	}
+			user, err := h.users.GetUser(ctx, userID)
+			log.Println("Got it from db")
+	if err != nil {
+		log.Printf("Callback: change language %v", err)
+		return "Error return get your language"
+	}
+	h.sessions.SetLanguage(userID, user.Language)
+	return h.T(user.Language, field)
+}
+
+func (h *Handler) GetUserLanguage(ctx context.Context, userID int64) string {
+	sess := h.sessions.Get(userID)
+	if sess.Language != "" {
+		log.Println("Got it from sessions")
+		return sess.Language
+	}
+			user, err := h.users.GetUser(ctx, userID)
+			log.Println("Got it from db")
+	if err != nil {
+		log.Printf("Callback: change language %v", err)
+		return "Error return get your language"
+	}
+	h.sessions.SetLanguage(userID, user.Language)
+	return user.Language
+
+}
+
+func (h *Handler) T(lang, key string) string {
+    localizer := i18n.NewLocalizer(h.bundle, lang)
+    msg, err := localizer.Localize(&i18n.LocalizeConfig{
+        MessageID: key,
+    })
+    if err != nil {
+        return key
+    }
+    return msg
 }

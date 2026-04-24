@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
-	"github.com/nicksnyder/go-i18n/v2/i18n"
 )
 
 // handleCallback processes inline keyboard button presses.
@@ -66,7 +65,7 @@ func (h *Handler) handleCallbackAction(ctx context.Context, cb *tgbotapi.Callbac
 
 	switch data {
 	case "go_to_menu":
-		kb, text := keyboard.MainMenu()
+		kb, text := keyboard.MainMenu(h.HandleUserLanguage(ctx, cb.From.ID, "AddReminder"), h.HandleUserLanguage(ctx, cb.From.ID, "GetReminders"), h.HandleUserLanguage(ctx, cb.From.ID, "Settings"), h.HandleUserLanguage(ctx, cb.From.ID, "WriteOwner"), h.HandleUserLanguage(ctx, cb.From.ID, "MainMenu"))
 		edit.Text = text
 		edit.ReplyMarkup = &kb
 		h.bot.Send(edit)
@@ -79,7 +78,8 @@ func (h *Handler) handleCallbackAction(ctx context.Context, cb *tgbotapi.Callbac
 		h.showReminders(ctx, chatID, cb.Message.MessageID, 0)
 
 	case "find_local_zone":
-		edit.Text = "Введите ваш город. Пример: Лондон, Киев, Москва"
+		text := h.HandleUserLanguage(ctx, chatID, "EnterCity")
+		edit.Text = text
 		h.bot.Send(edit)
 		h.sessions.SetState(chatID, session.StateWaitingForCity)
 
@@ -97,19 +97,25 @@ func (h *Handler) handleCallbackAction(ctx context.Context, cb *tgbotapi.Callbac
 			return
 		}
 		localTime, _ := service.GetLocalTime(tz)
-		edit.Text = fmt.Sprintf("<b>Ваша временная зона:</b> %s\n<b>Ваше локальное время:</b> %s", tz, localTime)
-		kb := keyboard.Settings()
+		user, err := h.users.GetUser(ctx, chatID)
+		if err != nil {
+			log.Printf("Can't get user's language %v", err)
+		}
+		text := h.HandleUserLanguage(ctx, chatID, "TimezoneInfoWithLanguage")
+		edit.Text = fmt.Sprintf(text, tz, localTime, user.Language)
+		kb := keyboard.Settings(h.HandleUserLanguage(ctx, chatID, "EnterCityAgain"), h.HandleUserLanguage(ctx, chatID, "ChooseLanguage"), h.HandleUserLanguage(ctx, chatID, "Back"))
 		edit.ReplyMarkup = &kb
 		h.bot.Send(edit)
 
 	case "write_me":
-		edit.Text = "По любым вопросам и предложениям пишите @susvlad228"
-		kb := keyboard.Back()
+		text := h.HandleUserLanguage(ctx, chatID, "WriteMe")
+		edit.Text = text
+		kb := keyboard.Back(h.HandleUserLanguage(ctx, cb.From.ID, "Back"))
 		edit.ReplyMarkup = &kb
 		h.bot.Send(edit)
 
 	case "add_reminder":
-		kb := keyboard.Back()
+		kb := keyboard.Back(h.HandleUserLanguage(ctx, cb.From.ID, "Back"))
 		edit.ReplyMarkup = &kb
 		username := ""
 		if update.SentFrom() != nil && update.SentFrom().UserName != "" {
@@ -117,12 +123,13 @@ func (h *Handler) handleCallbackAction(ctx context.Context, cb *tgbotapi.Callbac
 		} else if update.SentFrom() != nil {
 			username = update.SentFrom().FirstName
 		}
-		edit.Text = fmt.Sprintf("О чём тебе напомнить? Напиши текст напоминания.\n\nМожно делать совместные напоминания, отмечая знакомых. Например:\nзабрать посылку завтра @друг\nВыучить программирование через 2 часа %s\n\nПользователь должен быть зарегистрирован в боте.", username)
+		text := h.HandleUserLanguage(ctx, chatID, "AskReminderText")
+		edit.Text = fmt.Sprintf(text, username)
 		h.bot.Send(edit)
 		h.sessions.SetState(chatID, session.StateWaitingForReminder)
 
 	case "add_plan":
-		kb := keyboard.Back()
+		kb := keyboard.Back(h.HandleUserLanguage(ctx, cb.From.ID, "Back"))
 		edit.ReplyMarkup = &kb
 		edit.Text = "Напишите ваш план:"
 		h.bot.Send(edit)
@@ -134,7 +141,7 @@ func (h *Handler) handleCallbackAction(ctx context.Context, cb *tgbotapi.Callbac
 			log.Printf("handler: get plans error: %v", err)
 			return
 		}
-		kb := keyboard.Back()
+		kb := keyboard.Back(h.HandleUserLanguage(ctx, cb.From.ID, "Back"))
 		if len(plans) == 0 {
 			edit.Text = "У вас пока нет планов."
 		} else {
@@ -164,7 +171,7 @@ func (h *Handler) onSelectReminder(ctx context.Context, cb *tgbotapi.CallbackQue
 		return
 	}
 
-	text, kb := keyboard.ReminderDetail(rem)
+	text, kb := keyboard.ReminderDetail(rem, h.HandleUserLanguage(ctx, cb.From.ID, "FromAt"),  h.HandleUserLanguage(ctx, cb.From.ID, "Delete"),  h.HandleUserLanguage(ctx, cb.From.ID, "NoteCantBeDeleted"),  h.HandleUserLanguage(ctx, cb.From.ID, "NotCompleted"),  h.HandleUserLanguage(ctx, cb.From.ID, "Completed"),  h.HandleUserLanguage(ctx, cb.From.ID, "Remind"),  h.HandleUserLanguage(ctx, cb.From.ID, "CompletedStatus"),  h.HandleUserLanguage(ctx, cb.From.ID, "Back"))
 	edit.Text = text
 	edit.ReplyMarkup = &kb
 	h.bot.Send(edit)
@@ -204,8 +211,9 @@ func (h *Handler) onDeleteConfirm(cb *tgbotapi.CallbackQuery, edit tgbotapi.Edit
 		log.Printf("handler: invalid delete ID: %v", err)
 		return
 	}
-	kb := keyboard.ConfirmDelete(id)
-	edit.Text = "Вы точно хотите удалить заметку?"
+	kb := keyboard.ConfirmDelete(id, h.HandleUserLanguage(context.Background(), cb.From.ID, "Yes"), h.HandleUserLanguage(context.Background(), cb.From.ID, "No"))
+	text := h.HandleUserLanguage(context.Background(), cb.From.ID, "SureDeleteNote")
+	edit.Text = text
 	edit.ReplyMarkup = &kb
 	h.bot.Send(edit)
 }
@@ -237,15 +245,16 @@ func (h *Handler) onToggleDone(ctx context.Context, cb *tgbotapi.CallbackQuery, 
 		log.Printf("handler: toggle done failed: %v", err)
 		return
 	}
-
-	alert := tgbotapi.NewCallback(cb.ID, "Статус изменён")
+	
+	text := h.HandleUserLanguage(ctx, cb.From.ID, "StatusChanged")
+	alert := tgbotapi.NewCallback(cb.ID, text)
 	h.bot.Request(alert)
 
 	rem, err := h.reminders.GetByID(ctx, id)
 	if err != nil || rem == nil {
 		return
 	}
-	text, kb := keyboard.ReminderDetail(rem)
+	text, kb := keyboard.ReminderDetail(rem, h.HandleUserLanguage(ctx, cb.From.ID, "FromAt"),  h.HandleUserLanguage(ctx, cb.From.ID, "Delete"),  h.HandleUserLanguage(ctx, cb.From.ID, "NoteCantBeDeleted"),  h.HandleUserLanguage(ctx, cb.From.ID, "NotCompleted"),  h.HandleUserLanguage(ctx, cb.From.ID, "Completed"),  h.HandleUserLanguage(ctx, cb.From.ID, "Remind"),  h.HandleUserLanguage(ctx, cb.From.ID, "CompletedStatus"),  h.HandleUserLanguage(ctx, cb.From.ID, "Back"))
 	edit.Text = text
 	edit.ReplyMarkup = &kb
 	h.bot.Send(edit)
@@ -269,7 +278,7 @@ func (h *Handler) onReschedule(ctx context.Context, cb *tgbotapi.CallbackQuery, 
 		}
 	}
 
-	kb := keyboard.Back()
+	kb := keyboard.Back(h.HandleUserLanguage(ctx, cb.From.ID, "Back"))
 	edit.Text = confirmText
 	edit.ReplyMarkup = &kb
 	h.bot.Send(edit)
@@ -285,8 +294,8 @@ func (h *Handler) onOwnTime(ctx context.Context, cb *tgbotapi.CallbackQuery, dat
 	if err != nil {
 		log.Printf("handler: save note for own_time failed: %v", err)
 	}
-
-	h.send(chatID, "<b>Напишите когда отправить напоминание</b>. Пример:\nсегодня в 16:00, завтра в 9\nчерез 10 минут, через 2 часа\n5 февраля в 14:00, 12.03.2026 в 10")
+	text := h.HandleUserLanguage(ctx, cb.From.ID, "ExampleOfReminder")
+	h.send(chatID, text)
 
 	sess.State = session.StateWaitingForOwnTime
 	sess.PendingReminderID = id
@@ -305,8 +314,9 @@ func (h *Handler) onAcceptFriendReminder(ctx context.Context, cb *tgbotapi.Callb
 	parsed, err := h.reminders.AcceptFriendReminder(ctx, reminderID, cb.From.ID)
 	if err != nil {
 		log.Printf("handler: accept friend reminder failed: %v", err)
-		edit.Text = "Не удалось принять напоминание."
-		kb := keyboard.Back()
+		text := h.HandleUserLanguage(ctx, cb.From.ID, "ErrorAcceptRemind")
+		edit.Text = text
+		kb := keyboard.Back(h.HandleUserLanguage(ctx, cb.From.ID, "Back"))
 		edit.ReplyMarkup = &kb
 		h.bot.Send(edit)
 		return
@@ -318,9 +328,9 @@ func (h *Handler) onAcceptFriendReminder(ctx context.Context, cb *tgbotapi.Callb
 			log.Printf("handler: schedule accepted friend reminder failed: %v", err)
 		}
 	}
-
-	edit.Text = "Напоминание принято!"
-	kb, _ := keyboard.MainMenu()
+ 	text := h.HandleUserLanguage(ctx, cb.From.ID, "ReminderAccepted")
+	edit.Text = text
+	kb, _ := keyboard.MainMenu(h.HandleUserLanguage(ctx, cb.From.ID, "AddReminder"), h.HandleUserLanguage(ctx, cb.From.ID, "GetReminders"), h.HandleUserLanguage(ctx, cb.From.ID, "Settings"), h.HandleUserLanguage(ctx, cb.From.ID, "WriteOwner"), h.HandleUserLanguage(ctx, cb.From.ID, "MainMenu"))
 	edit.ReplyMarkup = &kb
 	h.bot.Send(edit)
 	h.sessions.Clear(cb.From.ID)
@@ -338,9 +348,9 @@ func (h *Handler) onDeclineFriendReminder(ctx context.Context, cb *tgbotapi.Call
 	if err := h.reminders.DeclineFriendReminder(ctx, reminderID, cb.From.ID); err != nil {
 		log.Printf("handler: decline friend reminder failed: %v", err)
 	}
-
-	edit.Text = "Напоминание отклонено."
-	kb, _ := keyboard.MainMenu()
+	text := h.HandleUserLanguage(ctx, cb.From.ID, "RemindRejected")
+	edit.Text = text 
+	kb, _ := keyboard.MainMenu(h.HandleUserLanguage(ctx, cb.From.ID, "AddReminder"), h.HandleUserLanguage(ctx, cb.From.ID, "GetReminders"), h.HandleUserLanguage(ctx, cb.From.ID, "Settings"), h.HandleUserLanguage(ctx, cb.From.ID, "WriteOwner"), h.HandleUserLanguage(ctx, cb.From.ID, "MainMenu"))
 	edit.ReplyMarkup = &kb
 	h.bot.Send(edit)
 	h.sessions.Clear(cb.From.ID)
@@ -348,15 +358,11 @@ func (h *Handler) onDeclineFriendReminder(ctx context.Context, cb *tgbotapi.Call
 
 func (h *Handler) onChangeLanguage(ctx context.Context, cb *tgbotapi.CallbackQuery, edit tgbotapi.EditMessageTextConfig, chatID int64, data string) {
 	h.bot.Request(tgbotapi.NewCallback(cb.ID, ""))
-		lng := strings.TrimPrefix(data, "language_")
+	lng := strings.TrimPrefix(data, "language_")
+	h.sessions.SetLanguage(chatID, lng)
 	h.users.SetLanguage(ctx, chatID, lng)
+	text := h.HandleUserLanguage(ctx, chatID, "ChangeCity")
 	flow := h.sessions.Get(cb.Message.Chat.ID)
-	user, err := h.users.GetUser(ctx, chatID)
-	if err != nil {
-		fmt.Errorf("Callback: change language %w", err)
-		return
-	}
-	text := h.T(user.Language, "ChangeCity")
 
 		switch flow.State {
 		case session.StateWaitingForLanguage:
@@ -366,7 +372,7 @@ func (h *Handler) onChangeLanguage(ctx context.Context, cb *tgbotapi.CallbackQue
 			h.sessions.SetState(chatID, session.StateWaitingForCity)
 			return
 		default:
-			kb, menuText := keyboard.MainMenu()
+			kb, menuText := keyboard.MainMenu(h.HandleUserLanguage(ctx, cb.From.ID, "AddReminder"), h.HandleUserLanguage(ctx, cb.From.ID, "GetReminders"), h.HandleUserLanguage(ctx, cb.From.ID, "Settings"), h.HandleUserLanguage(ctx, cb.From.ID, "WriteOwner"), h.HandleUserLanguage(ctx, cb.From.ID, "MainMenu"))
 			edit.Text = menuText
 			edit.ReplyMarkup = &kb
 			h.bot.Send(edit)
@@ -383,21 +389,9 @@ func (h *Handler) showReminders(ctx context.Context, chatID int64, messageID int
 		return
 	}
 
-	text, kb := keyboard.RemindersList(reminders, page)
+	text, kb := keyboard.RemindersList(reminders, page, h.HandleUserLanguage(ctx, chatID, "Back"), h.HandleUserLanguage(ctx, chatID, "NoReminders"), h.HandleUserLanguage(ctx, chatID, "Note"), h.HandleUserLanguage(ctx, chatID, "FromAt"), h.HandleUserLanguage(ctx, chatID, "BackReminders"), h.HandleUserLanguage(ctx, chatID,"NextReminders"), h.HandleUserLanguage(ctx, chatID, "ChooseNumber"), h.GetUserLanguage(ctx, chatID))
 	edit := tgbotapi.NewEditMessageText(chatID, messageID, text)
 	edit.ParseMode = tgbotapi.ModeHTML
 	edit.ReplyMarkup = &kb
 	h.bot.Send(edit)
-}
-
-func (h *Handler) T(lang, key string) string {
-    localizer := i18n.NewLocalizer(h.bundle, lang)
-    msg, err := localizer.Localize(&i18n.LocalizeConfig{
-        MessageID: key,
-    })
-    if err != nil {
-        return key
-    }
-
-    return msg
 }

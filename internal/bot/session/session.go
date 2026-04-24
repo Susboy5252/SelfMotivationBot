@@ -21,7 +21,7 @@ type Session struct {
 	MentionedIDs   []int64
 	PendingContent string // content waiting for a time to be set
 	SenderUsername string // username of the sender (for friend reminders)
-
+	Language string
 	// FriendReminder stores the reminder ID that was sent to friends
 	// so we can add recipients and schedule for them when they accept.
 	PendingReminderID int64
@@ -67,5 +67,13 @@ func (m *Manager) SetState(userID int64, state State) {
 	defer m.mu.Unlock()
 	s := m.sessions[userID]
 	s.State = state
+	m.sessions[userID] = s
+}
+
+func (m *Manager) SetLanguage(userID int64, language string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	s := m.sessions[userID]
+	s.Language = language
 	m.sessions[userID] = s
 }
