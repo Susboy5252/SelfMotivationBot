@@ -79,7 +79,7 @@ FROM reminders r
 JOIN reminder_recipients rr ON rr.reminder_id = r.id
 JOIN users u ON u.id = rr.sender_id
 WHERE rr.user_id = $1 AND rr.status = 'accepted'
-ORDER BY id ASC;
+ORDER BY id DESC;
 	`
 	rows, err := r.pool.Query(ctx, query, userID, timeZone)
 	if err != nil {

@@ -60,7 +60,7 @@ func (h *Handler) HandleUpdate(update tgbotapi.Update) {
 // OnReminderFired is called by the scheduler when a reminder's time arrives.
 // chatID is the target Telegram user who should receive the notification.
 func (h *Handler) OnReminderFired(chatID int64, reminderID int64, content string) {
-	text, kb := keyboard.RemindAgain(content, h.HandleUserLanguage(context.Background(), chatID, "RemindAgain"), h.HandleUserLanguage(context.Background(), chatID, "HalfHour"), h.HandleUserLanguage(context.Background(), chatID, "Hour"), h.HandleUserLanguage(context.Background(), chatID, "3Hours"), h.HandleUserLanguage(context.Background(), chatID, "Tomorrow"), h.HandleUserLanguage(context.Background(), chatID, "OwnTime"), h.HandleUserLanguage(context.Background(), chatID, "Back"))
+	text, kb := keyboard.RemindAgain(content, reminderID, h.HandleUserLanguage(context.Background(), chatID, "RemindAgain"), h.HandleUserLanguage(context.Background(), chatID, "HalfHour"), h.HandleUserLanguage(context.Background(), chatID, "Hour"), h.HandleUserLanguage(context.Background(), chatID, "3Hours"), h.HandleUserLanguage(context.Background(), chatID, "Tomorrow"), h.HandleUserLanguage(context.Background(), chatID, "OwnTime"), h.HandleUserLanguage(context.Background(), chatID, "Back"))
 	msg := tgbotapi.NewMessage(chatID, text)
 	msg.ReplyMarkup = kb
 	if _, err := h.bot.Send(msg); err != nil {

@@ -55,5 +55,9 @@
   "OwnTime": "Своё время",
   "Accept": "Принять",
   "Decline": "Отклонить",
-  "ConfirmUsername": "Подтвердить имя"
+  "ConfirmUsername": "Подтвердить имя",
+  "WillRemindIn30mins": "Напоминание повторится через полчаса",
+  "WillRemindInhour": "Напоминание повторится час",
+  "WillRemindIn3hours": "Напоминание повторится через 3 часа",
+  "WillRemindtomorrow": "Напоминание повторится завтра"
 }

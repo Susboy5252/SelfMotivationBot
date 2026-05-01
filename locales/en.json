@@ -55,5 +55,9 @@
   "OwnTime": "Custom time",
   "Accept": "Accept",
   "Decline": "Decline",
-  "ConfirmUsername": "Confirm username"
+  "ConfirmUsername": "Confirm username",
+  "WillRemindIn30mins": "The reminder will repeat in 30 minutes",
+  "WillRemindInhour": "The reminder will repeat in 1 hour",
+  "WillRemindIn3hours": "The reminder will repeat in 3 hours",
+  "WillRemindtomorrow": "The reminder will repeat tomorrow"
 }

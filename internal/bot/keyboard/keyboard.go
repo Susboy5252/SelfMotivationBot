@@ -230,17 +230,18 @@ func ReminderDetail(rem *models.Reminder, text1 string, text2 string, text3 stri
 }
 
 // RemindAgain builds a keyboard with quick reschedule options.
-func RemindAgain(content string, text1 string, text2 string, text3 string, text4 string, text5 string, text6 string, text7 string) (string, tgbotapi.InlineKeyboardMarkup) {
+func RemindAgain(content string,reminderID int64, text1 string, text2 string, text3 string, text4 string, text5 string, text6 string, text7 string) (string, tgbotapi.InlineKeyboardMarkup) {
+	reminderString := strconv.Itoa(int(reminderID))
 	text := content + text1
 	kb := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData(text2, "in_halfhour_"+content),
-			tgbotapi.NewInlineKeyboardButtonData(text3, "in_hour_"+content),
-			tgbotapi.NewInlineKeyboardButtonData(text4, "in_3hours_"+content),
-			tgbotapi.NewInlineKeyboardButtonData(text5, "tomorrow_"+content),
+			tgbotapi.NewInlineKeyboardButtonData(text2, "in_halfhour_"+reminderString),
+			tgbotapi.NewInlineKeyboardButtonData(text3, "in_hour_"+reminderString),
+			tgbotapi.NewInlineKeyboardButtonData(text4, "in_3hours_"+reminderString),
+			tgbotapi.NewInlineKeyboardButtonData(text5, "tomorrow_"+reminderString),
 		),
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData(text6, "own_time_"+content),
+			tgbotapi.NewInlineKeyboardButtonData(text6, "own_time_"+reminderString),
 		),
 		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData(text7, "go_to_menu"),

@@ -41,13 +41,13 @@ func (h *Handler) handleCallback(update tgbotapi.Update) {
 	case strings.HasPrefix(data, "done_"):
 		h.onToggleDone(ctx, cb, edit, data)
 	case strings.HasPrefix(data, "in_halfhour_"):
-		h.onReschedule(ctx, cb, edit, data, "in_halfhour_", "через 30 минут", "Напоминание повторится через полчаса")
+		h.onReschedule(ctx, cb, edit, data, "in_halfhour_", "через 30 минут", h.HandleUserLanguage(ctx, chatID, "WillRemindIn30mins"))
 	case strings.HasPrefix(data, "in_hour_"):
-		h.onReschedule(ctx, cb, edit, data, "in_hour_", "через час", "Напоминание повторится через час")
+		h.onReschedule(ctx, cb, edit, data, "in_hour_", "через час", h.HandleUserLanguage(ctx, chatID, "WillRemindInhour"))
 	case strings.HasPrefix(data, "in_3hours_"):
-		h.onReschedule(ctx, cb, edit, data, "in_3hours_", "через 3 часа", "Напоминание повторится через 3 часа")
+		h.onReschedule(ctx, cb, edit, data, "in_3hours_", "через 3 часа", h.HandleUserLanguage(ctx, chatID, "WillRemindIn3hours"))
 	case strings.HasPrefix(data, "tomorrow_"):
-		h.onReschedule(ctx, cb, edit, data, "tomorrow_", "завтра", "Напоминание повторится завтра")
+		h.onReschedule(ctx, cb, edit, data, "tomorrow_", "завтра", h.HandleUserLanguage(ctx, chatID, "WillRemindtomorrow"))
 	case strings.HasPrefix(data, "own_time_"):
 		h.onOwnTime(ctx, cb, data, sess)
 	case strings.HasPrefix(data, "accept_remind_"):
@@ -272,11 +272,20 @@ func (h *Handler) onToggleDone(ctx context.Context, cb *tgbotapi.CallbackQuery, 
 
 // onReschedule handles the quick reschedule buttons (30min, 1h, 3h, tomorrow).
 func (h *Handler) onReschedule(ctx context.Context, cb *tgbotapi.CallbackQuery, edit tgbotapi.EditMessageTextConfig, data, prefix, timeExpr, confirmText string) {
-	content := strings.TrimPrefix(data, prefix)
+	reminderID, err := strconv.Atoi(strings.TrimPrefix(data, prefix))
+	if err != nil {
+		log.Printf("Error onReschedule: %v", err)
+		return
+	}
 	chatID := cb.Message.Chat.ID
-
+	firedRimnder, err := h.reminders.GetByID(ctx,int64(reminderID))
+	if err != nil {
+		log.Printf("Error onReschedule: %v", err)
+		return
+	}
+	h.reminders.Delete(ctx, int64(reminderID), edit.ChatID)
 	// Save the content as a new reminder
-	parsed, err := h.reminders.ParseAndSave(ctx, chatID, content+" "+timeExpr)
+	parsed, err := h.reminders.ParseAndSave(ctx, chatID, firedRimnder.Content+" "+timeExpr)
 	if err != nil {
 		log.Printf("handler: reschedule failed: %v", err)
 		return
@@ -296,11 +305,22 @@ func (h *Handler) onReschedule(ctx context.Context, cb *tgbotapi.CallbackQuery, 
 
 // onOwnTime prompts the user to enter a custom time.
 func (h *Handler) onOwnTime(ctx context.Context, cb *tgbotapi.CallbackQuery, data string, sess session.Session) {
-	content := strings.TrimPrefix(data, "own_time_")
+	h.bot.Request(tgbotapi.NewCallback(cb.ID, ""))
 	chatID := cb.Message.Chat.ID
+	reminderID, err := strconv.Atoi(strings.TrimPrefix(data, "own_time_"))
+	if err != nil {
+		log.Printf("Error onReschedule: %v", err)
+		return
+	}
+	firedRimnder, err := h.reminders.GetByID(ctx,int64(reminderID))
+	if err != nil {
+		log.Printf("Error onReschedule: %v", err)
+		return
+	}
+	h.reminders.Delete(ctx, int64(reminderID), chatID)
 
 	// Save as note first, then wait for time input
-	id, err := h.reminders.SaveNote(ctx, chatID, content)
+	id, err := h.reminders.SaveNote(ctx, chatID, firedRimnder.Content)
 	if err != nil {
 		log.Printf("handler: save note for own_time failed: %v", err)
 	}
