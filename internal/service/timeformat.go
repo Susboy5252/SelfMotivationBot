@@ -46,7 +46,7 @@ func FormatDateTimeRu(t time.Time) string {
 }
 
 func FormatDateTimeEn(t time.Time) string {
-	return time.Now().Format("Monday 02 January 2006 15:04")
+	return t.Format("Monday 02 January 2006 15:04")
 }
 
 // GetLocalTime returns the current local time string for a timezone.

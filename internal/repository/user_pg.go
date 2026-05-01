@@ -95,3 +95,13 @@ func (r *userRepo) UpdateLanguage(ctx context.Context, id int64, language string
 	}
 	return nil
 }
+
+func (r *userRepo) UpdateUsername(ctx context.Context, id int64,username string) error {
+	_ , err := r.pool.Exec(ctx, "UPDATE users SET username = $1, updated_at = now() Where id = $2",
+	username, id,
+  )
+if err != nil {
+	return fmt.Errorf("userRepo.UpdateUsername: %w", err)
+  }
+	return nil
+}

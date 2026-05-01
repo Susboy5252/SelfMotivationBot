@@ -35,7 +35,7 @@ func (h *Handler) handleMessage(update tgbotapi.Update) {
 	}
 
 	// Handle "Open main menu" reply keyboard button
-	if text == "Открыть главное меню" {
+	if text == "Открыть главное меню" || text == "Open main menu" {
 		kb, menuText := keyboard.MainMenu(h.HandleUserLanguage(ctx, chatID, "AddReminder"), h.HandleUserLanguage(ctx, chatID, "GetReminders"), h.HandleUserLanguage(ctx, chatID, "Settings"), h.HandleUserLanguage(ctx, chatID, "WriteOwner"), h.HandleUserLanguage(ctx, chatID, "MainMenu"))
 		h.sendWithKeyboard(chatID, menuText, kb)
 		return
@@ -209,7 +209,7 @@ func (h *Handler) onReminderInput(ctx context.Context, chatID int64, username, t
 // onTimeInput handles time input for a reminder that was saved without a time.
 func (h *Handler) onTimeInput(ctx context.Context, chatID int64, text string, sess session.Session) {
 	// "Save as note" button
-	if text == "Сохранить как заметку" {
+	if text == "Сохранить как заметку" || text == "Save as note"{
 		text := h.HandleUserLanguage(ctx, chatID, "SavedAsNote")
 		h.sendWithReplyKeyboard(chatID, text, keyboard.OpenMainMenuButton(h.HandleUserLanguage(ctx, chatID, "OpenMainMenu")))
 
@@ -308,16 +308,43 @@ func (h *Handler) sendFriendReminders(ctx context.Context, senderChatID int64, s
 		// Build display text with time converted to the friend's timezone
 		text := h.HandleUserLanguage(ctx, friendID, "FromAt")
 		displayText := rem.Content + text + sess.SenderUsername
+		timeStr := ""
+		lng := h.GetUserLanguage(ctx, friendID)
 		if rem.RemindAt != nil && !rem.RemindAt.IsZero() {
 			friendTZ, err := h.users.GetTimezone(ctx, friendID)
 			if err == nil && friendTZ != "" {
 				if loc, err := time.LoadLocation(friendTZ); err == nil {
-					displayText += " " + service.FormatDateTimeRu(rem.RemindAt.In(loc))
+					switch lng {
+			case "ru":
+				timeStr = service.FormatDateTimeRu(rem.RemindAt.In(loc))
+			case "en":
+				timeStr = service.FormatDateTimeEn(rem.RemindAt.In(loc))
+			default:
+				timeStr = service.FormatDateTimeEn(rem.RemindAt.In(loc))
+			}
+					displayText += " " + timeStr
 				} else {
-					displayText += " " + service.FormatDateTimeRu(*rem.RemindAt)
+							switch lng {
+			case "ru":
+				timeStr = service.FormatDateTimeRu(*rem.RemindAt)
+			case "en":
+				timeStr = service.FormatDateTimeEn(*rem.RemindAt)
+			default:
+				timeStr = service.FormatDateTimeEn(*rem.RemindAt)
+			}
+					displayText += " " + timeStr
 				}
 			} else {
-				displayText += " " + service.FormatDateTimeRu(*rem.RemindAt)
+						switch lng {
+			case "ru":
+				timeStr = service.FormatDateTimeRu(*rem.RemindAt)
+			case "en":
+				timeStr = service.FormatDateTimeEn(*rem.RemindAt)
+			default:
+				timeStr = service.FormatDateTimeEn(*rem.RemindAt)
+			}
+					displayText += " "
+				displayText += " " + timeStr
 			}
 		}
 

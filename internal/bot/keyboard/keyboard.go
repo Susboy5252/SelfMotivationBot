@@ -45,14 +45,17 @@ func Back(text1 string) tgbotapi.InlineKeyboardMarkup {
 }
 
 // Settings returns the settings menu keyboard.
-func Settings(text1 string, text2 string, text3 string) tgbotapi.InlineKeyboardMarkup {
+func Settings(text1 string, text2 string, text3 string, text4 string) tgbotapi.InlineKeyboardMarkup {
 	return tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
 			tgbotapi.NewInlineKeyboardButtonData(text1, "find_local_zone"),
 			tgbotapi.NewInlineKeyboardButtonData(text2, "change_language"),
 		),
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData(text3,  "go_to_menu"),
+			tgbotapi.NewInlineKeyboardButtonData(text3, "confirm_username"),
+	),
+		tgbotapi.NewInlineKeyboardRow(
+			tgbotapi.NewInlineKeyboardButtonData(text4,  "go_to_menu"),
 		),
 	)
 }
@@ -139,6 +142,9 @@ func RemindersList(reminders []models.Reminder, page int, text1 string, text2 st
 		if rem.Done {
 			status = "✅"
 		}
+		if rem.IsNote() {
+			status = ""
+		}
 
 		// Format: "1. TEXT от @username | DATE STATUS" or "1. TEXT | DATE STATUS"
 		if rem.SenderUsername != "" {
@@ -177,7 +183,7 @@ func RemindersList(reminders []models.Reminder, page int, text1 string, text2 st
 }
 
 // ReminderDetail builds the detail view for a single reminder.
-func ReminderDetail(rem *models.Reminder, text1 string, text2 string, text3 string, text4 string, text5 string, text6 string, text7 string, text8 string) (string, tgbotapi.InlineKeyboardMarkup) {
+func ReminderDetail(rem *models.Reminder, text1 string, text2 string, text3 string, text4 string, text5 string, text6 string, text7 string, text8 string, lng string) (string, tgbotapi.InlineKeyboardMarkup) {
 	text := rem.Content
 	if rem.SenderUsername != "" {
 		text += text1 + rem.SenderUsername
@@ -195,7 +201,17 @@ func ReminderDetail(rem *models.Reminder, text1 string, text2 string, text3 stri
 		if rem.Done {
 			statusText = text5
 		}
-		text += text6 + service.FormatDateTimeRu(*rem.RemindAt)
+		timeStr := ""
+					switch lng{
+			case "ru":
+				timeStr = service.FormatDateTimeRu(*rem.RemindAt)
+			case "en":
+				timeStr = service.FormatDateTimeEn(*rem.RemindAt)
+			default:
+				timeStr = service.FormatDateTimeEn(*rem.RemindAt)
+			}
+
+		text += text6 + timeStr
 		text += text7 + statusText
 
 		actionRow = append(actionRow,

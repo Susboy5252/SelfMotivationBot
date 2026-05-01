@@ -10,6 +10,7 @@ import (
 
 	"github.com/olebedev/when"
 	"github.com/olebedev/when/rules/ru"
+	"github.com/olebedev/when/rules/en"
 )
 
 // ParsedReminder holds the result of parsing a reminder text with a potential time expression.
@@ -52,6 +53,7 @@ func (s *ReminderService) ParseAndSave(ctx context.Context, userID int64, text s
 	now := time.Now().In(loc)
 	w := when.New(nil)
 	w.Add(ru.All...)
+	w.Add(en.All...)
 
 	result, err := w.Parse(text, now)
 	if err != nil {
@@ -178,6 +180,7 @@ func (s *ReminderService) SetTime(ctx context.Context, userID int64, timeText st
 	now := time.Now().In(loc)
 	w := when.New(nil)
 	w.Add(ru.All...)
+	w.Add(en.All...)
 
 	result, err := w.Parse(timeText, now)
 	if err != nil || result == nil {

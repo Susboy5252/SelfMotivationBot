@@ -13,6 +13,7 @@ type UserRepository interface {
 	UpdateCity(ctx context.Context, id int64, city string) error
 	UpdateLanguage(ctx context.Context, id int64, language string) error
 	UpdateTimezone(ctx context.Context, id int64, timezone string) error
+	UpdateUsername(ctx context.Context, id int64, username string) error
 }
 
 // ReminderRepository defines all data-access operations for reminders.

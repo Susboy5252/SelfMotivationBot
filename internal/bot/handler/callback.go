@@ -90,6 +90,16 @@ func (h *Handler) handleCallbackAction(ctx context.Context, cb *tgbotapi.Callbac
 		edit.ReplyMarkup = &kb
 		h.bot.Send(edit)
 
+	case "confirm_username":
+		err := h.users.SetUsername(ctx, cb.From.ID, cb.From.UserName)
+		if err != nil {
+			log.Printf("Can't confirm user")
+		}
+		_, err = h.bot.Request(tgbotapi.NewCallback(update.CallbackQuery.ID, ""))
+		if err != nil {
+		log.Printf("Can't answer callback: %v", err)
+	}
+
 	case "settings":
 		tz, err := h.users.GetTimezone(ctx, chatID)
 		if err != nil {
@@ -103,7 +113,7 @@ func (h *Handler) handleCallbackAction(ctx context.Context, cb *tgbotapi.Callbac
 		}
 		text := h.HandleUserLanguage(ctx, chatID, "TimezoneInfoWithLanguage")
 		edit.Text = fmt.Sprintf(text, tz, localTime, user.Language)
-		kb := keyboard.Settings(h.HandleUserLanguage(ctx, chatID, "EnterCityAgain"), h.HandleUserLanguage(ctx, chatID, "ChooseLanguage"), h.HandleUserLanguage(ctx, chatID, "Back"))
+		kb := keyboard.Settings(h.HandleUserLanguage(ctx, chatID, "EnterCityAgain"), h.HandleUserLanguage(ctx, chatID, "ChooseLanguage"),h.HandleUserLanguage(ctx, chatID, "ConfirmUsername"), h.HandleUserLanguage(ctx, chatID, "Back"))
 		edit.ReplyMarkup = &kb
 		h.bot.Send(edit)
 
@@ -171,7 +181,7 @@ func (h *Handler) onSelectReminder(ctx context.Context, cb *tgbotapi.CallbackQue
 		return
 	}
 
-	text, kb := keyboard.ReminderDetail(rem, h.HandleUserLanguage(ctx, cb.From.ID, "FromAt"),  h.HandleUserLanguage(ctx, cb.From.ID, "Delete"),  h.HandleUserLanguage(ctx, cb.From.ID, "NoteCantBeDeleted"),  h.HandleUserLanguage(ctx, cb.From.ID, "NotCompleted"),  h.HandleUserLanguage(ctx, cb.From.ID, "Completed"),  h.HandleUserLanguage(ctx, cb.From.ID, "Remind"),  h.HandleUserLanguage(ctx, cb.From.ID, "CompletedStatus"),  h.HandleUserLanguage(ctx, cb.From.ID, "Back"))
+	text, kb := keyboard.ReminderDetail(rem, h.HandleUserLanguage(ctx, cb.From.ID, "FromAt"),  h.HandleUserLanguage(ctx, cb.From.ID, "Delete"),  h.HandleUserLanguage(ctx, cb.From.ID, "NoteCantBeDeleted"),  h.HandleUserLanguage(ctx, cb.From.ID, "NotCompleted"),  h.HandleUserLanguage(ctx, cb.From.ID, "Completed"),  h.HandleUserLanguage(ctx, cb.From.ID, "Remind"),  h.HandleUserLanguage(ctx, cb.From.ID, "CompletedStatus"),  h.HandleUserLanguage(ctx, cb.From.ID, "Back"), h.GetUserLanguage(ctx, cb.From.ID))
 	edit.Text = text
 	edit.ReplyMarkup = &kb
 	h.bot.Send(edit)
@@ -254,7 +264,7 @@ func (h *Handler) onToggleDone(ctx context.Context, cb *tgbotapi.CallbackQuery, 
 	if err != nil || rem == nil {
 		return
 	}
-	text, kb := keyboard.ReminderDetail(rem, h.HandleUserLanguage(ctx, cb.From.ID, "FromAt"),  h.HandleUserLanguage(ctx, cb.From.ID, "Delete"),  h.HandleUserLanguage(ctx, cb.From.ID, "NoteCantBeDeleted"),  h.HandleUserLanguage(ctx, cb.From.ID, "NotCompleted"),  h.HandleUserLanguage(ctx, cb.From.ID, "Completed"),  h.HandleUserLanguage(ctx, cb.From.ID, "Remind"),  h.HandleUserLanguage(ctx, cb.From.ID, "CompletedStatus"),  h.HandleUserLanguage(ctx, cb.From.ID, "Back"))
+	text, kb := keyboard.ReminderDetail(rem, h.HandleUserLanguage(ctx, cb.From.ID, "FromAt"),  h.HandleUserLanguage(ctx, cb.From.ID, "Delete"),  h.HandleUserLanguage(ctx, cb.From.ID, "NoteCantBeDeleted"),  h.HandleUserLanguage(ctx, cb.From.ID, "NotCompleted"),  h.HandleUserLanguage(ctx, cb.From.ID, "Completed"),  h.HandleUserLanguage(ctx, cb.From.ID, "Remind"),  h.HandleUserLanguage(ctx, cb.From.ID, "CompletedStatus"),  h.HandleUserLanguage(ctx, cb.From.ID, "Back"), h.GetUserLanguage(ctx, cb.From.ID))
 	edit.Text = text
 	edit.ReplyMarkup = &kb
 	h.bot.Send(edit)

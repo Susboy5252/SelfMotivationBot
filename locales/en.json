@@ -14,7 +14,7 @@
   "TimezoneInfo": "<b>Your time zone:</b> %s\n<b>Your local time:</b> %s",
   "CityNotFound": "We couldn't find your city. Please try entering it again.\nExample: London, Kyiv, Moscow",
   "EnterCity": "Enter your city. Example: London, Kyiv, Moscow",
-  "TimezoneInfoWithLanguage": "<b>Your time zone:</b> %s\n<b>Your local time:</b> %s\n<b>Your language:</b> %s",
+  "TimezoneInfoWithLanguage": "<b>Your time zone:</b> %s\n<b>Your local time:</b> %s\n<b>Your language:</b> %s\n\nPlease press the “Confirm username” button if you have changed your username.",
   "WriteMe": "For any questions or suggestions, write to @susvlad228",
   "AskReminderText": "What should I remind you about? Write the reminder text.\n\nYou can create shared reminders by mentioning friends. For example:\npick up a package tomorrow @friend\nStudy programming in 2 hours %s\n\nThe user must be registered in the bot.",
   "SureDeleteNote": "Are you sure you want to delete the note?",
@@ -54,5 +54,6 @@
   "Tomorrow": "tomorrow",
   "OwnTime": "Custom time",
   "Accept": "Accept",
-  "Decline": "Decline"
+  "Decline": "Decline",
+  "ConfirmUsername": "Confirm username"
 }
