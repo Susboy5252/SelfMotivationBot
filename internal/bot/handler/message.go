@@ -144,8 +144,12 @@ func (h *Handler) onReminderInput(ctx context.Context, chatID int64, username, t
 	parsed, err := h.reminders.ParseAndSave(ctx, chatID, cleanText)
 	if err != nil {
 		log.Printf("handler: save reminder failed: %v", err)
-		h.send(chatID, "Произошла ошибка при сохранении. Попробуйте ещё раз.")
-		h.sessions.Clear(chatID)
+		text := h.HandleUserLanguage(ctx, chatID, "ErrorEmptyReminder")
+		h.send(chatID, text)
+		
+	kb, menuText := keyboard.MainMenu(h.HandleUserLanguage(ctx, chatID, "AddReminder"), h.HandleUserLanguage(ctx, chatID, "GetReminders"), h.HandleUserLanguage(ctx, chatID, "Settings"), h.HandleUserLanguage(ctx, chatID, "WriteOwner"), h.HandleUserLanguage(ctx, chatID, "MainMenu"))
+	h.sendWithKeyboard(chatID, menuText, kb)
+	h.sessions.Clear(chatID)
 		return
 	}
 	sess.PendingReminderID = parsed.ID

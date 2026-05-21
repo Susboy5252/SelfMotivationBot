@@ -287,6 +287,8 @@ func (h *Handler) onReschedule(ctx context.Context, cb *tgbotapi.CallbackQuery, 
 	// Save the content as a new reminder
 	parsed, err := h.reminders.ParseAndSave(ctx, chatID, firedRimnder.Content+" "+timeExpr)
 	if err != nil {
+		text := h.HandleUserLanguage(ctx, chatID, "ErrorEmptyReminder")
+		h.send(cb.From.ID, text)
 		log.Printf("handler: reschedule failed: %v", err)
 		return
 	}
